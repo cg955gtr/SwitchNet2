@@ -1,10 +1,8 @@
 # SwitchNet2
 
 An efficient strictly-typed networking module for reducing bandwidth and overhead across remotes.
-
-> **NOTE:** Unsupported objects (e.g. Instances) are simply passed through a reference routing table, as instances like that are not possible to compress currently.
-
-This library is also compatible with --!strict typechecking.
+It has similar syntax to ByteNet, except with proper --!strict compatibility and more efficient compression/decompression.
+> ^ Compression is especially much more efficient, most notably when dealing with complex type structures
 
 # Installation
 
@@ -12,4 +10,4 @@ This library is also compatible with --!strict typechecking.
 
 # Documentation
 
-> For documentation, refer to the `DOCS.md` file.
+> ~~For documentation, refer to the `DOCS.md` file.~~ (WIP)
