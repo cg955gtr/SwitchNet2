@@ -22,6 +22,8 @@ type Query<T1, T2> = Typedefs.Query<T1, T2>
 --// @module Types
 
 local types = {
+	null = require("./Types/null") :: nil,
+
 	optional = require("./Types/optional") :: <T>(optType: T) -> T?,
 	array = require("./Types/array") :: <T>(array: T) -> { T },
 	map = require("./Types/map") :: <T1, T2>(keyType: T1, valueType: T2) -> { [T1]: T2 },
@@ -76,6 +78,13 @@ do
 	--// ^ Cache for auto types so we don't have to redetermine them for the GetGize and Write calls
 
 	local autoTypes = {
+
+		{
+			Type = types.null :: any,
+			Condition = function(value: any, typeName: string): boolean
+				return typeName == "nil"
+			end,
+		},
 
 		--// Int/float types
 
