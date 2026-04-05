@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local runContext: "Client" | "Server" = if RunService:IsClient() then "Client" else "Server"
 
+local TypeStores = require("@self/TypeStores")
 local Byte = require("@self/Byte")
 local Typedefs = require("@self/Typedefs")
 local Namespaces = require("@self/Namespaces")
@@ -45,61 +46,15 @@ type ConvertedTypeTree = { Name: string, Args: { ConvertedTypeTree }? }
 
 --// @module SwitchNet
 
-local SwitchNet2 = {}
-SwitchNet2.NamespaceShareStore = nil :: Folder?
+local SwitchNet2 = {
+	Types = TypeStores,
+	NamespaceShareStore = nil :: Folder?,
+}
 
-local types = table.freeze({
-	optional = require("@self/Types/optional") :: <T>(optType: T) -> T?,
-	array = require("@self/Types/array") :: <T>(array: T) -> { T },
-	map = require("@self/Types/map") :: <T1, T2>(keyType: T1, valueType: T2) -> { [T1]: T2 },
-	struct = require("@self/Types/struct") :: <T>(struct: T) -> T,
-
-	unknown = require("@self/Types/unknown")() :: unknown,
-
-	boolean = require("@self/Types/boolean")() :: boolean,
-	buffer = require("@self/Types/buffer")() :: buffer,
-
-	string = require("@self/Types/string")() :: string,
-	shortstring = require("@self/Types/shortstring")() :: string,
-
-	u8 = require("@self/Types/u8")() :: number,
-	i8 = require("@self/Types/i8")() :: number,
-	u16 = require("@self/Types/u16")() :: number,
-	i16 = require("@self/Types/i16")() :: number,
-	u32 = require("@self/Types/u32")() :: number,
-	i32 = require("@self/Types/i32")() :: number,
-	f32 = require("@self/Types/f32")() :: number,
-	f64 = require("@self/Types/f64")() :: number,
-
-	EnumItem = require("@self/Types/EnumItem")() :: EnumItem,
-
-	CFrame = require("@self/Types/CFrame")() :: CFrame,
-
-	vector = require("@self/Types/vector")() :: vector,
-
-	Vector2 = require("@self/Types/Vector2")() :: Vector2,
-	Vector3 = require("@self/Types/Vector3")() :: Vector3,
-	Vector2int16 = require("@self/Types/Vector2int16")() :: Vector2int16,
-	Vector3int16 = require("@self/Types/Vector3int16")() :: Vector3int16,
-
-	UDim = require("@self/Types/UDim")() :: UDim,
-	UDim2 = require("@self/Types/UDim2")() :: UDim2,
-
-	Color3 = require("@self/Types/Color3")() :: Color3,
-	Color3u8 = require("@self/Types/Color3u8")() :: Color3,
-
-	TweenInfo = require("@self/Types/TweenInfo")() :: TweenInfo,
-
-	NumberRange = require("@self/Types/NumberRange")() :: NumberRange,
-
-	Instance = require("@self/Types/Instance")() :: Instance,
-})
-
-SwitchNet2.Types = types
 
 --// Setup type name lookup, for namespace sharing
 local typeNameLookups = {} :: { [StreamType<any>]: string }
-for name, streamType in (types :: any) :: { [string]: StreamType<any> } do
+for name, streamType in (TypeStores :: any) :: { [string]: StreamType<any> } do
 	if type(streamType) ~= "function" then
 		typeNameLookups[streamType] = name :: string
 	end
@@ -400,7 +355,7 @@ function SwitchNet2._convertStreamTypeToNameTree<T>(streamType: StreamType<T>): 
 end
 
 function SwitchNet2._convertNameTreeToStreamType<T>(typeData: ConvertedTypeTree): StreamType<T>
-	local streamType = (types :: any)[typeData.Name]
+	local streamType = (TypeStores :: any)[typeData.Name]
 	
 	if typeData.Args then
 		local typeArgs = {}
