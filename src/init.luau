@@ -1,0 +1,540 @@
+--// Author: 8ch99
+--// Date written: 25th March 2026
+--// SwitchNet2
+
+--!strict
+--!native
+--!optimize 2
+
+const VERSION = "v0.0.0"
+const OUTPUT_MESSAGE = true
+
+const NAMESPACE_NAME_SIZE_LIMIT = 32
+const PACKET_NAME_SIZE_LIMIT = 64
+
+const NAMESPACE_STORAGE_NAME = "SwitchNet2_Namespaces"
+
+--// Services
+
+local Players = game:GetService("Players")
+local LogService = game:GetService("LogService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TestService = game:GetService("TestService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Dependencies
+
+local runContext: "Client" | "Server" = if RunService:IsClient() then "Client" else "Server"
+
+local Byte = require("@self/Byte")
+local Typedefs = require("@self/Typedefs")
+local Namespaces = require("@self/Namespaces")
+local ServerProcessor = require("@self/Processors/Server")
+local ClientProcessor = require("@self/Processors/Client")
+
+--// Typedefs
+
+type StreamType<T> = Typedefs.StreamType<T>
+type StreamTypeWithArgs<T> = Typedefs.StreamTypeWithArgs<T>
+
+type Packet<T> = Typedefs.Packet<T>
+type Query<T1, T2> = Typedefs.Query<T1, T2>
+
+type ConvertedTypeTree = { Name: string, Args: { ConvertedTypeTree }? }
+
+--// @module SwitchNet
+
+local SwitchNet2 = {}
+SwitchNet2.NamespaceShareStore = nil :: Folder?
+
+local types = table.freeze({
+	optional = require("@self/Types/optional") :: <T>(optType: T) -> T?,
+	array = require("@self/Types/array") :: <T>(array: T) -> { T },
+	map = require("@self/Types/map") :: <T1, T2>(keyType: T1, valueType: T2) -> { [T1]: T2 },
+	struct = require("@self/Types/struct") :: <T>(struct: T) -> T,
+
+	unknown = require("@self/Types/unknown")() :: unknown,
+
+	boolean = require("@self/Types/boolean")() :: boolean,
+	buffer = require("@self/Types/buffer")() :: buffer,
+
+	string = require("@self/Types/string")() :: string,
+	shortstring = require("@self/Types/shortstring")() :: string,
+
+	u8 = require("@self/Types/u8")() :: number,
+	i8 = require("@self/Types/i8")() :: number,
+	u16 = require("@self/Types/u16")() :: number,
+	i16 = require("@self/Types/i16")() :: number,
+	u32 = require("@self/Types/u32")() :: number,
+	i32 = require("@self/Types/i32")() :: number,
+	f32 = require("@self/Types/f32")() :: number,
+	f64 = require("@self/Types/f64")() :: number,
+
+	EnumItem = require("@self/Types/EnumItem")() :: EnumItem,
+
+	CFrame = require("@self/Types/CFrame")() :: CFrame,
+
+	vector = require("@self/Types/vector")() :: vector,
+
+	Vector2 = require("@self/Types/Vector2")() :: Vector2,
+	Vector3 = require("@self/Types/Vector3")() :: Vector3,
+	Vector2int16 = require("@self/Types/Vector2int16")() :: Vector2int16,
+	Vector3int16 = require("@self/Types/Vector3int16")() :: Vector3int16,
+
+	UDim = require("@self/Types/UDim")() :: UDim,
+	UDim2 = require("@self/Types/UDim2")() :: UDim2,
+
+	Color3 = require("@self/Types/Color3")() :: Color3,
+	Color3u8 = require("@self/Types/Color3u8")() :: Color3,
+
+	TweenInfo = require("@self/Types/TweenInfo")() :: TweenInfo,
+
+	NumberRange = require("@self/Types/NumberRange")() :: NumberRange,
+
+	Instance = require("@self/Types/Instance")() :: Instance,
+})
+
+SwitchNet2.Types = types
+
+--// Setup type name lookup, for namespace sharing
+local typeNameLookups = {} :: { [StreamType<any>]: string }
+for name, streamType in (types :: any) :: { [string]: StreamType<any> } do
+	if type(streamType) ~= "function" then
+		typeNameLookups[streamType] = name :: string
+	end
+end
+
+
+
+function SwitchNet2.RegisterPacket<T>(parameters: { Mode: "Reliable" | "Unreliable", Type: T }, ShareToAll: boolean?): Packet<T>
+	--// Packet name and namespace are assigned later when the namespace is registered
+	local streamType = (parameters.Type :: any) :: StreamType<T>
+	local self = {
+		Id = "",
+		Namespace = "",
+		Mode = parameters.Mode,
+
+		StreamType = streamType,
+		ByteSize = streamType.Size,
+	} :: Packet<T>
+
+
+	function self.SendToAll(data: T)
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		ServerProcessor.QueueToAll(self, buff, references)
+	end
+
+	function self.SendToPlayers(data: T, players: { Player })
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		for _, player in players do
+			ServerProcessor.Queue(self, buff, references, player)
+		end
+	end
+
+	function self.SendToAllExcept(data: T, exemptPlayer: Player)
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		for _, player in Players:GetPlayers() do
+			if player ~= exemptPlayer then
+				ServerProcessor.Queue(self, buff, references, player)
+			end
+		end
+	end
+
+
+	function self.SendToAllUnreliable(data: T)
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		ServerProcessor.QueueToAllUnreliable(self, buff, references)
+	end
+
+	function self.SendToPlayersUnreliable(data: T, players: { Player })
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		for _, player in players do
+			ServerProcessor.QueueUnreliable(self, buff, references, player)
+		end
+	end
+
+	function self.SendToAllExceptUnreliable(data: T, exemptPlayer: Player)
+		assert(runContext == "Server", "This is a server only function!")
+		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		for _, player in Players:GetPlayers() do
+			if player ~= exemptPlayer then
+				ServerProcessor.QueueUnreliable(self, buff, references, player)
+			end
+		end
+	end
+
+
+	if runContext == "Client" then
+
+		function self.Send(data: T)
+			local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+			ClientProcessor.Queue(self, buff, references)
+		end
+
+		function self.SendUnreliable(data: T)
+			local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+			ClientProcessor.QueueUnreliable(self, buff, references)
+		end
+
+
+		function self.ListenClient(callback: (T) -> ()): () -> ()
+			local bound = true
+			local callbackId = self.Namespace .. self.Id .. HttpService:GenerateGUID(false)
+			ClientProcessor.Bind(callbackId, function(namespaceId: string, packet: string, value: any)
+				if namespaceId == self.Namespace and packet == self.Id then
+					callback(value)
+				end
+			end)
+
+			return function()
+				if not bound then return end
+				bound = false
+				ClientProcessor.Unbind(callbackId)
+			end
+		end
+
+		function self.Wait(timeout: number?): T?
+			local thread = coroutine.running()
+			local timeoutThread
+
+			local disconnect: () -> ()
+			disconnect = self.ListenClient(function(value: T)
+				disconnect()
+				coroutine.resume(thread, value)
+				if timeoutThread then
+					task.cancel(timeoutThread)
+					timeoutThread = nil :: never
+				end
+			end)
+
+			if timeout then
+				timeoutThread = task.delay(timeout, function()
+					timeoutThread = nil :: never
+					disconnect()
+					coroutine.resume(thread, nil, nil)
+				end)
+			end
+
+			return coroutine.yield()
+		end
+
+	else
+		
+		function self.Send(data: T, player: Player?)
+			local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+			ServerProcessor.Queue(self, buff, references, player :: Player)
+		end
+
+		function self.SendUnreliable(data: T, player: Player?)
+			local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+			ServerProcessor.QueueUnreliable(self, buff, references, player :: Player)
+		end
+
+
+		function self.ListenServer(callback: (T, Player) -> ()): () -> ()
+			local bound = true
+			local callbackId = self.Namespace .. self.Id .. HttpService:GenerateGUID(false)
+			ServerProcessor.Bind(callbackId, function(player: Player, namespaceId: string, packet: string, value: any)
+				if namespaceId == self.Namespace and packet == self.Id then
+					callback(value, player)
+				end
+			end)
+
+			return function()
+				if not bound then return end
+				bound = false
+				ServerProcessor.Unbind(callbackId)
+			end
+		end
+
+		function self.Wait(timeout: number?): (T?, Player?)
+			local thread = coroutine.running()
+			local timeoutThread
+
+			local disconnect: () -> ()
+			disconnect = self.ListenServer(function(value: T, player: Player)
+				disconnect()
+				coroutine.resume(thread, value, player)
+				if timeoutThread then
+					task.cancel(timeoutThread)
+					timeoutThread = nil :: never
+				end
+			end)
+
+			if timeout then
+				timeoutThread = task.delay(timeout, function()
+					timeoutThread = nil :: never
+					disconnect()
+					coroutine.resume(thread, nil, nil)
+				end)
+			end
+
+			return coroutine.yield()
+		end
+
+	end
+	
+
+	return self
+end
+
+
+
+function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, ResponseType: T2 }): Query<T1, T2>
+	--// Packet name and namespace are assigned later when the namespace is registered
+	local requestStreamType = (parameters.RequestType :: any) :: StreamType<T1>
+	local responseStreamType = (parameters.ResponseType :: any) :: StreamType<T2>
+
+	local self = {
+		Id = "",
+		Namespace = "",
+
+		RequestStreamType = requestStreamType,
+		RequestByteSize = requestStreamType.Size,
+		ResponseStreamType = responseStreamType,
+		ResponseByteSize = responseStreamType.Size,
+	} :: Query<T1, T2>
+
+
+	function self.ListenServer(callback: (data: T1, player: Player) -> T2): () -> ()
+		assert(runContext == "Server", "This is a server only function!")
+		local bound = true
+		ServerProcessor.SetResponseHandler(self.Namespace, self.Id, callback)
+
+		return function()
+			if not bound then return end
+			bound = false
+			ServerProcessor.RemoveResponseHandler(self.Namespace, self.Id)
+		end
+	end
+
+	function self.ListenClient(callback: (data: T1) -> T2): () -> ()
+		assert(runContext == "Client", "This is a client only function!")
+		local bound = true
+		ClientProcessor.SetResponseHandler(self.Namespace, self.Id, callback)
+
+		return function()
+			if not bound then return end
+			bound = false
+			ClientProcessor.RemoveResponseHandler(self.Namespace, self.Id)
+		end
+	end
+
+
+	if runContext == "Client" then
+
+		function self.Invoke(data: T1): T2
+			local buff, references = Byte.CompressStreamType(self.RequestStreamType, data, self.RequestByteSize)
+			return ClientProcessor.Invoke(self, buff, references)
+		end
+
+	else
+		
+		function self.Invoke(data: T1, player: Player?): T2
+			local buff, references = Byte.CompressStreamType(self.RequestStreamType, data, self.RequestByteSize)
+			return ServerProcessor.Invoke(self, player :: Player, buff, references)
+		end
+
+	end
+
+
+	return self
+end
+
+
+
+function SwitchNet2.RegisterNamespace<T>(name: string, packets: T, share: boolean?): T
+	assert(#name <= NAMESPACE_NAME_SIZE_LIMIT, `Namespace name '{name}' is too large! Size limit is {NAMESPACE_NAME_SIZE_LIMIT}`)
+	--assert(Namespaces[name] == nil, `Namespace '{name}' already exists!`)
+	if Namespaces[name] then
+		return (Namespaces[name] :: any) :: T
+	end
+
+	local typecasted = (packets :: any) :: { [string]: Packet<any> }
+	Namespaces[name] = typecasted
+
+	for packetName in typecasted do
+		assert(#packetName <= PACKET_NAME_SIZE_LIMIT, `Packet name '{packetName}' in namespace '{name}' is too large! Size limit is {PACKET_NAME_SIZE_LIMIT}`)
+	end
+
+	for packetName, packet in typecasted do
+		packet.Id = packetName
+		packet.Namespace = name
+	end
+
+	if share and runContext == "Server" then
+		SwitchNet2._shareNamespace(typecasted, name)
+	end
+
+	return packets
+end
+
+
+--// Namespace sharing handlers
+
+
+function SwitchNet2._convertStreamTypeToNameTree<T>(streamType: StreamType<T>): ConvertedTypeTree
+	local name = typeNameLookups[streamType :: StreamType<T>]
+	if name then
+		return { Name = name }
+	end
+
+	local typecasted = streamType :: StreamTypeWithArgs<T>
+	local customName = typecasted.TypeName :: string
+		
+	local typeArgNames = {} :: { ConvertedTypeTree }
+	for i, v in typecasted.TypeArgs do
+		typeArgNames[i] = SwitchNet2._convertStreamTypeToNameTree(v)
+	end
+
+	return {
+		Name = customName,
+		Args = typeArgNames,
+	}
+end
+
+function SwitchNet2._convertNameTreeToStreamType<T>(typeData: ConvertedTypeTree): StreamType<T>
+	local streamType = (types :: any)[typeData.Name]
+	
+	if typeData.Args then
+		local typeArgs = {}
+		for index, data in typeData.Args do
+			typeArgs[index] = SwitchNet2._convertNameTreeToStreamType(data)
+		end
+		return streamType(table.unpack(typeArgs))
+	end
+
+	return streamType
+end
+
+
+
+function SwitchNet2._shareNamespace(namespace: { [string]: Packet<any> | Query<any, any> }, name: string)
+
+	if not SwitchNet2.NamespaceShareStore then return end
+	if SwitchNet2.NamespaceShareStore:FindFirstChild(name) then return end
+
+	local data = {} :: { any }
+
+	for _, v in namespace do
+		local isQuery = (v :: any).Invoke ~= nil
+		local structure = {
+			IsQuery = isQuery,
+			Id = v.Id,
+		}
+
+		if isQuery then
+			local typecasted = v :: Query<any, any>
+			structure.RequestType = SwitchNet2._convertStreamTypeToNameTree(typecasted.RequestStreamType)
+			structure.ResponseType = SwitchNet2._convertStreamTypeToNameTree(typecasted.ResponseStreamType)
+		else
+			local typecasted = v :: Packet<any>
+			structure.Mode = typecasted.Mode
+			structure.Type = SwitchNet2._convertStreamTypeToNameTree(typecasted.StreamType)
+		end
+
+		table.insert(data, structure)
+	end
+	
+	local value = Instance.new("StringValue")
+	value.Name = name
+	value.Value = HttpService:JSONEncode(data)
+	value.Parent = SwitchNet2.NamespaceShareStore
+
+end
+
+function SwitchNet2._registerRemoteNamespace(value: StringValue): { [string]: Packet<any> | Query<any, any> }?
+
+	local name = value.Name
+	if Namespaces[name] then return nil end --// Probably locally defined already somewhere
+
+	local data = HttpService:JSONDecode(value.Value)
+	
+	local packets = {} :: { [string]: Packet<any> | Query<any, any> }
+
+	for _, structure in data do
+		local id = structure.Id
+		local isQuery = structure.IsQuery
+
+		if isQuery then
+			packets[id] = SwitchNet2.RegisterQuery({
+				RequestType = SwitchNet2._convertNameTreeToStreamType(structure.RequestType),
+				ResponseType = SwitchNet2._convertNameTreeToStreamType(structure.ResponseType),
+			}) :: any
+		else
+			packets[id] = SwitchNet2.RegisterPacket({
+				Mode = structure.Mode,
+				Type = SwitchNet2._convertNameTreeToStreamType(structure.Type),
+			}) :: any
+		end
+	end
+
+	return SwitchNet2.RegisterNamespace(name, packets)
+
+end
+
+
+
+if runContext == "Server" then
+	SwitchNet2.NamespaceShareStore = ReplicatedStorage:FindFirstChild(NAMESPACE_STORAGE_NAME) :: Folder
+	if not SwitchNet2.NamespaceShareStore then
+		local shareStore = Instance.new("Folder")
+		shareStore.Name = NAMESPACE_STORAGE_NAME
+		shareStore.Parent = ReplicatedStorage
+
+		SwitchNet2.NamespaceShareStore = shareStore
+	end
+else
+	SwitchNet2.NamespaceShareStore = ReplicatedStorage:WaitForChild(NAMESPACE_STORAGE_NAME) :: Folder
+	
+	local shareStore = SwitchNet2.NamespaceShareStore :: Folder
+	shareStore.ChildAdded:Connect(function(value: Instance)
+		SwitchNet2._registerRemoteNamespace(value :: StringValue)
+	end)
+
+	for _, value in shareStore:GetChildren() do
+		SwitchNet2._registerRemoteNamespace(value :: StringValue)
+	end
+end
+
+
+--// Finalize
+
+ServerProcessor.init(runContext)
+ClientProcessor.init(runContext)
+
+
+
+if OUTPUT_MESSAGE then
+	task.spawn(function()
+		--// Print message
+		--// Check if it exists already too, so if theres several dependencies, it won't add extras
+		local message = `SwitchNet2 {runContext} - {VERSION} loaded successfully! Created by 8ch99.`
+		local logHistory = LogService:GetLogHistory() :: {
+			{
+				timestamp: number,
+				message: string,
+				messageType: Enum.MessageType,
+			}
+		}
+		
+		for _, log in logHistory do
+			if log.messageType == Enum.MessageType.MessageInfo and string.find(log.message, message, nil, true) then
+				--// Message was sent already, cancel!
+				return
+			end
+		end
+		
+		TestService:Message(message)
+	end)
+end
+
+
+
+return table.freeze(SwitchNet2)
