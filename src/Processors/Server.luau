@@ -11,16 +11,18 @@ const PACKET_NAME_SIZE_LIMIT = 64
 
 --// Services
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TestService = game:GetService("TestService")
+const Players = game:GetService("Players")
+const ReplicatedStorage = game:GetService("ReplicatedStorage")
+const RunService = game:GetService("RunService")
+const TestService = game:GetService("TestService")
 
 --// Dependencies
 
-local Byte = require("../Byte")
-local Typedefs = require("../Typedefs")
-local Namespaces = require("../Namespaces")
+const Byte = require("../Byte")
+const Typedefs = require("../Typedefs")
+const Namespaces = require("../Namespaces")
+
+
 
 local function GetChildAndReconcileIfNil(parent: Instance, name: string, className: string): Instance
 	local child = parent:FindFirstChild(name)
@@ -61,20 +63,20 @@ type NetworkPacket = Typedefs.NetworkPacket
 
 --// @module ServerProcessor
 
-local ServerProcessor = {}
+const ServerProcessor = {}
 
 
-local sendStack = {} :: { [Player]: { NetworkPacket } }
-local sendStackUnreliable = {} :: { [Player]: { NetworkPacket } }
-local globalSendStack = {} :: { NetworkPacket }
-local globalSendStackUnreliable = {} :: { NetworkPacket }
-local requestStack = {} :: { [Player]: { { Thread: thread, Packet: NetworkPacket } } }
+const sendStack = {} :: { [Player]: { NetworkPacket } }
+const sendStackUnreliable = {} :: { [Player]: { NetworkPacket } }
+const globalSendStack = {} :: { NetworkPacket }
+const globalSendStackUnreliable = {} :: { NetworkPacket }
+const requestStack = {} :: { [Player]: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } }
 
-local processingRequests = {} :: { [thread]: Player }
+const processingRequests = {} :: { [thread]: { Player: Player, RequestThread: thread, TimeoutThread: thread? } }
 
-local eventCallbacks = {} :: { [string]: (Player, string, string, any) -> () }
-local eventCallbacksUnreliable = {} :: { [string]: (Player, string, string, any) -> () }
-local responseHandlers = {} :: {
+const eventCallbacks = {} :: { [string]: (Player, string, string, any) -> () }
+const eventCallbacksUnreliable = {} :: { [string]: (Player, string, string, any) -> () }
+const responseHandlers = {} :: {
 	[string]: {
 		[string]: (any, Player) -> any,
 	}
@@ -166,7 +168,7 @@ function ServerProcessor.QueueToAllUnreliable<T>(packet: Packet<T>, buff: buffer
 	})
 end
 
-function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, buff: buffer, references: { any }): T2
+function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, buff: buffer, references: { any }, timeout: number?): T2
 	local thread = coroutine.running()
 	local stack = requestStack[player]
 	if not stack then
@@ -176,6 +178,7 @@ function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, bu
 	
 	table.insert(stack, {
 		Thread = thread,
+		Timeout = timeout,
 		Packet = {
 			Namespace = query.Namespace,
 			Packet = query.Id,
@@ -212,25 +215,39 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 			requestStack[player] = nil
 		end
 
-		for thread, respondingPlayer in processingRequests do
-			if respondingPlayer == player then
-				coroutine.resume(thread, nil)
+		for mainThread, data in processingRequests do
+			if data.Player == player then
+				coroutine.resume(mainThread, nil)
+
+				pcall(task.cancel, data.RequestThread)
+				if data.TimeoutThread then
+					pcall(task.cancel, data.TimeoutThread)
+				end
 			end
 		end
 
 	end)
 
 
-	ServerProcessor._replicationJob = RunService.PostSimulation:Connect(function(delta: number)
+	ServerProcessor._replicationJob = RunService.PostSimulation:Connect(function()
 
 		--// Per-player stacks
 		for player, requests in requestStack do
 			for _, request in requests do
-				local thread = request.Thread
-				processingRequests[thread] = player
 
-				task.spawn(function()
+				local thread = request.Thread
+				
+				local timeoutThread: thread?
+				local requestThread = task.spawn(function()
 					local responsePacket: NetworkPacket? = remoteFunction:InvokeClient(player, request.Packet)
+
+					if timeoutThread then
+						task.cancel(timeoutThread)
+						timeoutThread = nil
+					end
+
+					if not thread then return end --// probably was GCed
+					
 					processingRequests[thread] = nil
 					
 					if not responsePacket then
@@ -247,6 +264,21 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 					local value = Byte.DecompressStreamType(packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
 					coroutine.resume(thread, value)
 				end)
+
+				if request.Timeout ~= nil then
+					timeoutThread = task.delay(request.Timeout, function()
+						coroutine.resume(thread, nil)
+						pcall(task.cancel, requestThread)
+						timeoutThread = nil
+					end)
+				end
+
+				processingRequests[thread] = {
+					Player = player,
+					RequestThread = requestThread,
+					TimeoutThread = timeoutThread
+				}
+
 			end
 		end
 

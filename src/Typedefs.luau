@@ -47,6 +47,7 @@ export type Query<T1, T2> = {
 	RequestByteSize: number?,
 	ResponseStreamType: StreamType<T2>,
 	ResponseByteSize: number?,
+	Timeout: number?,
 
 	Invoke: (data: T1, target: Player?) -> T2,
 

@@ -14,7 +14,7 @@ const MAX_REFERENCES = 2 ^ 16
 
 --// Dependencies
 
-local Typedefs = require("./Typedefs")
+const Typedefs = require("./Typedefs")
 
 --// Typedefs
 
@@ -40,7 +40,7 @@ end
 
 
 
-local Byte = {}
+const Byte = {}
 Byte.GetSizeOfType = GetSizeOfType
 
 function Byte.CompressStreamType<T>(streamType: StreamType<T>, data: T, byteSize: number?): (buffer, { any })

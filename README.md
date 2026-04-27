@@ -10,4 +10,4 @@ It has similar syntax to ByteNet, except with proper --!strict compatibility and
 
 # Documentation
 
-> ~~For documentation, refer to the `DOCS.md` file.~~ (WIP)
+> ~~For documentation, refer to the `DOCS.md` file.~~ **(WIP)**

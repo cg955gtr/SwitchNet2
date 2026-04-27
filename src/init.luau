@@ -2,11 +2,35 @@
 --// Date written: 25th March 2026
 --// SwitchNet2
 
+--[=[
+	MIT License
+
+	Copyright (c) 2026 8ch99
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be included in all
+	copies or substantial portions of the Software.
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+	SOFTWARE.
+]=]
+
 --!strict
 --!native
 --!optimize 2
 
-const VERSION = "v0.0.0"
+const VERSION = "v0.2.0"
 const OUTPUT_MESSAGE = true
 
 const NAMESPACE_NAME_SIZE_LIMIT = 32
@@ -16,23 +40,23 @@ const NAMESPACE_STORAGE_NAME = "SwitchNet2_Namespaces"
 
 --// Services
 
-local Players = game:GetService("Players")
-local LogService = game:GetService("LogService")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-local TestService = game:GetService("TestService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+const Players = game:GetService("Players")
+const LogService = game:GetService("LogService")
+const RunService = game:GetService("RunService")
+const HttpService = game:GetService("HttpService")
+const TestService = game:GetService("TestService")
+const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --// Dependencies
 
-local runContext: "Client" | "Server" = if RunService:IsClient() then "Client" else "Server"
+const runContext: "Client" | "Server" = if RunService:IsClient() then "Client" else "Server"
 
-local TypeStores = require("@self/TypeStores")
-local Byte = require("@self/Byte")
-local Typedefs = require("@self/Typedefs")
-local Namespaces = require("@self/Namespaces")
-local ServerProcessor = require("@self/Processors/Server")
-local ClientProcessor = require("@self/Processors/Client")
+const TypeStores = require("@self/TypeStores")
+const Byte = require("@self/Byte")
+const Typedefs = require("@self/Typedefs")
+const Namespaces = require("@self/Namespaces")
+const ServerProcessor = require("@self/Processors/Server")
+const ClientProcessor = require("@self/Processors/Client")
 
 --// Typedefs
 
@@ -46,14 +70,14 @@ type ConvertedTypeTree = { Name: string, Args: { ConvertedTypeTree }? }
 
 --// @module SwitchNet
 
-local SwitchNet2 = {
+const SwitchNet2 = {
 	Types = TypeStores,
 	NamespaceShareStore = nil :: Folder?,
 }
 
 
 --// Setup type name lookup, for namespace sharing
-local typeNameLookups = {} :: { [StreamType<any>]: string }
+const typeNameLookups = {} :: { [StreamType<any>]: string }
 for name, streamType in (TypeStores :: any) :: { [string]: StreamType<any> } do
 	if type(streamType) ~= "function" then
 		typeNameLookups[streamType] = name :: string
@@ -241,7 +265,7 @@ end
 
 
 
-function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, ResponseType: T2 }): Query<T1, T2>
+function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, ResponseType: T2, Timeout: number? }): Query<T1, T2>
 	--// Packet name and namespace are assigned later when the namespace is registered
 	local requestStreamType = (parameters.RequestType :: any) :: StreamType<T1>
 	local responseStreamType = (parameters.ResponseType :: any) :: StreamType<T2>
@@ -254,6 +278,7 @@ function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, Respons
 		RequestByteSize = requestStreamType.Size,
 		ResponseStreamType = responseStreamType,
 		ResponseByteSize = responseStreamType.Size,
+		Timeout = parameters.Timeout,
 	} :: Query<T1, T2>
 
 
@@ -286,14 +311,14 @@ function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, Respons
 
 		function self.Invoke(data: T1): T2
 			local buff, references = Byte.CompressStreamType(self.RequestStreamType, data, self.RequestByteSize)
-			return ClientProcessor.Invoke(self, buff, references)
+			return ClientProcessor.Invoke(self, buff, references, self.Timeout)
 		end
 
 	else
 		
 		function self.Invoke(data: T1, player: Player?): T2
 			local buff, references = Byte.CompressStreamType(self.RequestStreamType, data, self.RequestByteSize)
-			return ServerProcessor.Invoke(self, player :: Player, buff, references)
+			return ServerProcessor.Invoke(self, player :: Player, buff, references, self.Timeout)
 		end
 
 	end
@@ -480,7 +505,7 @@ if OUTPUT_MESSAGE then
 		}
 		
 		for _, log in logHistory do
-			if log.messageType == Enum.MessageType.MessageInfo and string.find(log.message, message, nil, true) then
+			if log.message == message then
 				--// Message was sent already, cancel!
 				return
 			end

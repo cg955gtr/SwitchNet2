@@ -8,8 +8,8 @@
 
 --// Dependencies
 
-local Byte = require("./Byte")
-local Typedefs = require("./Typedefs")
+const Byte = require("./Byte")
+const Typedefs = require("./Typedefs")
 
 --// Typedefs
 
@@ -21,7 +21,7 @@ type Query<T1, T2> = Typedefs.Query<T1, T2>
 
 --// @module Types
 
-local types = {
+const types = {
 	null = require("./Types/null") :: nil,
 
 	optional = require("./Types/optional") :: <T>(optType: T) -> T?,
@@ -288,6 +288,7 @@ do
 			return 1 + typeData.Type.Write(buff, references, pointer + 1, value)
 		end,
 	} :: any
+	
 end
 
 
