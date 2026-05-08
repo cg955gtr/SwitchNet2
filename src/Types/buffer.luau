@@ -13,8 +13,8 @@ return function()
 		end,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): (buffer, number)
-			local size = buffer.readu16(buff, pointer)
-			local newBuffer = buffer.create(size)
+			local size: number = buffer.readu16(buff, pointer)
+			local newBuffer: buffer = buffer.create(size)
 			if size == 0 then
 				return newBuffer, 2
 			end
@@ -24,7 +24,7 @@ return function()
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: buffer): number
-			local size = buffer.len(value)
+			local size: number = buffer.len(value)
 			buffer.writeu16(buff, pointer, size)
 			if size > 0 then
 				buffer.copy(buff, pointer + 2, value, size)

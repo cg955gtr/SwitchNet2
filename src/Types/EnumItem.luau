@@ -10,12 +10,11 @@ local enumNames: { string } = {}
 for _, list in Enum:GetEnums() do
 	table.insert(enumNames, tostring(list))
 end
-
 table.sort(enumNames) --// mandate same order between contexts
 
 
-local enumLookup: { Enum } = {}
-local reverseEnumLookup: { [Enum]: number } = {}
+const enumLookup: { Enum } = {}
+const reverseEnumLookup: { [Enum]: number } = {}
 
 for index, name in enumNames do
 	local enum = Enum[name]
@@ -33,8 +32,8 @@ return function()
 		Size = 6,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): (EnumItem, number)
-			local value = buffer.readu32(buff, pointer)
-			local listValue = buffer.readu16(buff, pointer + 4)
+			local value: number = buffer.readu32(buff, pointer)
+			local listValue: number = buffer.readu16(buff, pointer + 4)
 
 			return (enumLookup[listValue] :: any):FromValue(value), 6
 		end,

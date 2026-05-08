@@ -4,6 +4,6 @@
 
 --!strict
 
-local Typedefs = require("./Typedefs")
+const Typedefs = require("./Typedefs")
 
 return {} :: { [string]: { [string]: Typedefs.Packet<any> } }

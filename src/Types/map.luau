@@ -6,28 +6,34 @@
 --!native
 --!optimize 2
 
-local Typedefs = require("../Typedefs")
+const Typedefs = require("../Typedefs")
 
 return function<T1, T2>(keyType: Typedefs.StreamType<T1>, valueType: Typedefs.StreamType<T2>)
-	local readKey = keyType.Read
-	local writeKey = keyType.Write
-	local readValue = valueType.Read
-	local writeValue = valueType.Write
+
+	const readKey: (buffer, { any }, number) -> (T1, number) = keyType.Read
+	const writeKey: (buffer, { any }, number, T1) -> number = keyType.Write
+	const readValue: (buffer, { any }, number) -> (T2, number) = valueType.Read
+	const writeValue: (buffer, { any }, number, T2) -> number = valueType.Write
 	
-	local fixedKeySize = keyType.Size
-	local getKeySize = keyType.GetSize
-	local fixedValueSize = valueType.Size
-	local getValueSize = valueType.GetSize
+	const fixedKeySize: number? = keyType.Size
+	const getKeySize: ((T1) -> number)? = keyType.GetSize
+	const fixedValueSize: number? = valueType.Size
+	const getValueSize: ((T2) -> number)? = valueType.GetSize
 
 	return {
 		TypeName = "map",
 		TypeArgs = { keyType, valueType } :: { Typedefs.StreamType<any> },
 
 		GetSize = function(value: { [T1]: T2 }): number
-			local size = 2
-			local count = 0
-			for _ in value do
-				count += 1
+
+			local size: number = 2
+			local count: number = 0
+			
+			if fixedKeySize or fixedValueSize then
+				--// get count
+				for _ in value do
+					count += 1
+				end
 			end
 
 			if fixedKeySize then
@@ -47,45 +53,51 @@ return function<T1, T2>(keyType: Typedefs.StreamType<T1>, valueType: Typedefs.St
 			end
 
 			return size
+
 		end,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): ({ [T1]: T2 }, number)
-			local pointerOffset = 2
-			local size = buffer.readu16(buff, pointer)
+
+			local pointerOffset: number = 2
+			local size: number = buffer.readu16(buff, pointer)
 			if size == 0 then
 				return {}, pointerOffset
 			end
 
-			local value = {} :: { [T1]: T2 }
+			local value: { [T1]: T2 } = {}
 
-			for i = 1, size do
-				local mapKey, keyOffset = readKey(buff, references, pointer + pointerOffset)
+			for i: number = 1, size do
+				local mapKey: T1, keyOffset: number = readKey(buff, references, pointer + pointerOffset)
 				pointerOffset += keyOffset
-				local mapValue, valueOffset = readValue(buff, references, pointer + pointerOffset)
+				local mapValue: T2, valueOffset: number = readValue(buff, references, pointer + pointerOffset)
 				pointerOffset += valueOffset
 
 				value[mapKey] = mapValue
 			end
 
 			return value, pointerOffset
+
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: { [T1]: T2 }): number
-			local count = 0
+			
+			local count: number = 0
 			for _ in value do
 				count += 1
 			end
 			buffer.writeu16(buff, pointer, count)
 
-			local basePointer = pointer
+			local basePointer: number = pointer
 			pointer += 2
 			
-			for mapKey, mapValue in value do
+			for mapKey: T1, mapValue: T2 in value do
 				pointer += writeKey(buff, references, pointer, mapKey)
 				pointer += writeValue(buff, references, pointer, mapValue)
 			end
 
 			return pointer - basePointer
+
 		end,
 	}
+
 end

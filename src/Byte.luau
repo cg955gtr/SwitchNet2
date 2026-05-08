@@ -24,13 +24,13 @@ type Query<T1, T2> = Typedefs.Query<T1, T2>
 
 --// @module Byte
 
-local function GetSizeOfType<T>(streamType: StreamType<T>, associatedData: T): number
-	local size = streamType.Size
+local function getSizeOfType<T>(streamType: StreamType<T>, associatedData: T): number
+	local size: number? = streamType.Size
 	if size then
 		return size
 	end
 
-	local getSize = streamType.GetSize
+	local getSize: ((T) -> number)? = streamType.GetSize
 	if getSize then
 		return getSize(associatedData)
 	end
@@ -40,23 +40,23 @@ end
 
 
 
-const Byte = {}
-Byte.GetSizeOfType = GetSizeOfType
+const Byte = {
+	GetSizeOfType = getSizeOfType
+}
 
 function Byte.CompressStreamType<T>(streamType: StreamType<T>, data: T, byteSize: number?): (buffer, { any })
-	local size = byteSize or GetSizeOfType(streamType, data)
-	local buff = buffer.create(size + HEADER_SIZE)
-	local references = table.create(32) :: { any }
-	local pointer = HEADER_SIZE
+	local size: number = byteSize or getSizeOfType(streamType, data)
+	local buff: buffer = buffer.create(size + HEADER_SIZE)
+	local references: { any } = table.create(32) :: { any }
 
 	buffer.writestring(buff, 0, HEADER)
-	pointer += streamType.Write(buff, references, HEADER_SIZE, data)
+	streamType.Write(buff, references, HEADER_SIZE, data)
 
 	return buff, references
 end
 
 function Byte.DecompressStreamType<T>(streamType: StreamType<T>, buff: buffer, references: { any }): T
-	local size = buffer.len(buff)
+	local size: number = buffer.len(buff)
 	assert(size <= BUFFER_SIZE_LIMIT, "buffer too large!")
 	assert(buffer.readstring(buff, 0, HEADER_SIZE) == HEADER, "invalid data sequence provided (unknown header)")
 	assert(#references <= MAX_REFERENCES, "too many references!")

@@ -20,7 +20,7 @@ return function()
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: UDim2): number
-			local x, y = value.X, value.Y
+			local x: UDim, y: UDim = value.X, value.Y
 			buffer.writef32(buff, pointer, x.Scale)
 			buffer.writei32(buff, pointer + 4, x.Offset)
 			buffer.writef32(buff, pointer + 8, y.Scale)

@@ -8,33 +8,43 @@
 
 return function()
 	return {
-		Size = 15,
+		Size = 13,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): (TweenInfo, number)
-			local time = buffer.readf32(buff, pointer)
-			local styleValue = buffer.readu8(buff, pointer + 4)
-			local directionValue = buffer.readu8(buff, pointer + 5)
-			local repeatCount = buffer.readi32(buff, pointer + 6)
-			local reverses = buffer.readu8(buff, pointer + 10) ~= 0
-			local delayTime = buffer.readf32(buff, pointer + 11)
+			local bitOffset: number = pointer * 8
+
+			local time: number = buffer.readf32(buff, pointer)
+
+			--// easing style, direction and reverse bool all stored in the same byte
+			local styleValue: number = buffer.readbits(buff, bitOffset + 32, 4)
+			local directionValue: number = buffer.readbits(buff, bitOffset + 36, 3)
+			local reverses: boolean = buffer.readbits(buff, bitOffset + 39, 1) ~= 0
+
+			local repeatCount: number = buffer.readi32(buff, pointer + 5)
+			local delayTime: number = buffer.readf32(buff, pointer + 9)
 
 			--// Get enums
 			local easingStyle = Enum.EasingStyle:FromValue(styleValue) :: Enum.EasingStyle
 			local easingDirection = Enum.EasingDirection:FromValue(directionValue) :: Enum.EasingDirection
 
 			--// Create tween info
-			return TweenInfo.new(time, easingStyle, easingDirection, repeatCount, reverses, delayTime), 15
+			return TweenInfo.new(time, easingStyle, easingDirection, repeatCount, reverses, delayTime), 13
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: TweenInfo): number
-			buffer.writef32(buff, pointer, value.Time)
-			buffer.writeu8(buff, pointer + 4, value.EasingStyle.Value)
-			buffer.writeu8(buff, pointer + 5, value.EasingDirection.Value)
-			buffer.writei32(buff, pointer + 6, value.RepeatCount)
-			buffer.writeu8(buff, pointer + 10, if value.Reverses then 1 else 0)
-			buffer.writef32(buff, pointer + 11, value.DelayTime)
+			local bitOffset: number = pointer * 8
 
-			return 15
+			buffer.writef32(buff, pointer, value.Time)
+
+			--// easing style, direction and reverse bool all stored in the same byte
+			buffer.writebits(buff, bitOffset + 32, 4, value.EasingStyle.Value)
+			buffer.writebits(buff, bitOffset + 36, 3, value.EasingDirection.Value)
+			buffer.writebits(buff, bitOffset + 39, 1, if value.Reverses then 1 else 0)
+
+			buffer.writei32(buff, pointer + 5, value.RepeatCount)
+			buffer.writef32(buff, pointer + 9, value.DelayTime)
+
+			return 13
 		end,
 	}
 end

@@ -24,6 +24,8 @@ export type Packet<T> = {
 	StreamType: StreamType<T>,
 	ByteSize: number?,
 
+	_filters: { [string]: (T, Player?) -> boolean },
+
 	Send: (data: T, target: Player?) -> (),
 	SendToAll: (data: T) -> (),
 	SendToPlayers: (data: T, targets: { Player }) -> (),

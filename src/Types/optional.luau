@@ -6,21 +6,22 @@
 --!native
 --!optimize 2
 
-local Typedefs = require("../Typedefs")
+const Typedefs = require("../Typedefs")
 
 return function<T>(valueType: Typedefs.StreamType<T>)
-	local read = valueType.Read
-	local write = valueType.Write
-	
-	local fixedSize = valueType.Size
-	local getSize = valueType.GetSize
+
+	const read: (buffer, { any }, number) -> (T, number) = valueType.Read
+	const write: (buffer, { any }, number, T) -> number = valueType.Write
+
+	const fixedSize: number? = valueType.Size
+	const getSize: ((T) -> number)? = valueType.GetSize
 
 	return {
 		TypeName = "optional",
 		TypeArgs = { valueType },
 		
 		GetSize = function(value: T?): number
-			local size = 1
+			local size: number = 1
 			if not value then
 				return size
 			end
@@ -35,7 +36,7 @@ return function<T>(valueType: Typedefs.StreamType<T>)
 		end,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): (T?, number)
-			local exists = buffer.readu8(buff, pointer) == 1
+			local exists: boolean = buffer.readu8(buff, pointer) == 1
 			if exists then
 				local value, offset = read(buff, references, pointer + 1)
 				return value, offset + 1
@@ -51,4 +52,5 @@ return function<T>(valueType: Typedefs.StreamType<T>)
 			return 1
 		end,
 	}
+	
 end

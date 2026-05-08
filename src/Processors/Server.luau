@@ -37,7 +37,7 @@ local function GetChildAndReconcileIfNil(parent: Instance, name: string, classNa
 	return newInstance
 end
 
-local function GetPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
+local function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
 	if type(packet) ~= "table" then return end
 	if type(packet.Data) ~= "buffer" then return end
 	if type(packet.References) ~= "table" then return end
@@ -215,7 +215,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 			requestStack[player] = nil
 		end
 
-		for mainThread, data in processingRequests do
+		for mainThread: thread, data in processingRequests do
 			if data.Player == player then
 				coroutine.resume(mainThread, nil)
 
@@ -235,10 +235,10 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 		for player, requests in requestStack do
 			for _, request in requests do
 
-				local thread = request.Thread
+				local thread: thread = request.Thread
 				
 				local timeoutThread: thread?
-				local requestThread = task.spawn(function()
+				local requestThread: thread = task.spawn(function()
 					local responsePacket: NetworkPacket? = remoteFunction:InvokeClient(player, request.Packet)
 
 					if timeoutThread then
@@ -255,7 +255,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 						return
 					end
 
-					local packet = GetPacketOrQueryAndVerifyPacket(responsePacket)
+					local packet = getPacketOrQueryAndVerifyPacket(responsePacket)
 					if not packet then
 						coroutine.resume(thread, nil)
 						return
@@ -317,25 +317,24 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 
 
 
-	local function ProcessIncomingCall(player: Player, incomingData: { NetworkPacket }, callbackList: { [string]: (Player, string, string, any) -> () })
+	local function processIncomingCall(player: Player, incomingData: { NetworkPacket }, callbackList: { [string]: (Player, string, string, any) -> () })
 		if not next(callbackList) then return end
 		
 		--// Verify data first, before we deserialize anything
 		if type(incomingData) ~= "table" then return end
 
-		for _, networkPacket in incomingData do
-			if not GetPacketOrQueryAndVerifyPacket(networkPacket) then return end
+		for _, networkPacket: NetworkPacket in incomingData do
+			if not getPacketOrQueryAndVerifyPacket(networkPacket) then return end
 		end
 
-		for _, networkPacket in incomingData do
-			local namespaceName = networkPacket.Namespace
-			local packetName = networkPacket.Packet
+		for _, networkPacket: NetworkPacket in incomingData do
+			local namespaceName: string = networkPacket.Namespace
+			local packetName: string = networkPacket.Packet
 
 			local namespace = Namespaces[namespaceName]
 			local packet = namespace[packetName]
 
-			local success1, value = pcall(Byte.DecompressStreamType, packet.StreamType, networkPacket.Data, networkPacket.References)
-
+			local success1: boolean, value: any = pcall(Byte.DecompressStreamType, packet.StreamType, networkPacket.Data, networkPacket.References)
 			if not success1 or not value then return end --// 99% of the time it'd be a malformed packet (due to tampering)
 			
 			for name, callback in callbackList do
@@ -350,11 +349,11 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 
 
 	ServerProcessor._onServerEvent = remoteEvent.OnServerEvent:Connect(function(player: Player, incomingData: { NetworkPacket })
-		ProcessIncomingCall(player, incomingData, eventCallbacks)
+		processIncomingCall(player, incomingData, eventCallbacks)
 	end)
 
 	ServerProcessor._onServerEventUnreliable = unreliableRemoteEvent.OnServerEvent:Connect(function(player: Player, incomingData: { NetworkPacket })
-		ProcessIncomingCall(player, incomingData, eventCallbacksUnreliable)
+		processIncomingCall(player, incomingData, eventCallbacksUnreliable)
 	end)
 
 
@@ -363,7 +362,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 		if not next(responseHandlers) then return nil end
 
 		--// Verify data first, before we deserialize anything
-		local packet = GetPacketOrQueryAndVerifyPacket(networkPacket)
+		local packet = getPacketOrQueryAndVerifyPacket(networkPacket)
 		if not packet then return nil end
 
 		--// Ensure theres actually a response handler
@@ -372,11 +371,10 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 		if not responseHandler then return nil end
 
 		--// Proceed!
-		local success1, value = pcall(Byte.DecompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)
+		local success1: boolean, value: any = pcall(Byte.DecompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)
 		if not success1 or not value then return nil end
 
 		local success, result = pcall(responseHandler, value, player)
-
 		if not success then return nil end
 		--// ^ Return nothing, safest choice
 

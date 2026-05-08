@@ -36,6 +36,7 @@ const types = {
 
 	string = require("./Types/string")() :: string,
 	shortstring = require("./Types/shortstring")() :: string,
+	fixedstring = require("./Types/fixedstring") :: (size: number) -> string,
 
 	u8 = require("./Types/u8")() :: number,
 	i8 = require("./Types/i8")() :: number,
@@ -49,6 +50,7 @@ const types = {
 	EnumItem = require("./Types/EnumItem")() :: EnumItem,
 
 	CFrame = require("./Types/CFrame")() :: CFrame,
+	shortCFrame = require("./Types/shortCFrame") :: CFrame,
 
 	vector = require("./Types/vector")() :: vector,
 

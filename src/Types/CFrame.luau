@@ -23,7 +23,7 @@ return function()
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: CFrame): number
-			local rX, rY, rZ = value:ToEulerAnglesXYZ()
+			local rX: number, rY: number, rZ: number = value:ToEulerAnglesXYZ()
 
 			buffer.writef32(buff, pointer, value.X)
 			buffer.writef32(buff, pointer + 4, value.Y)

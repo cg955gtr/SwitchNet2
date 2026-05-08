@@ -23,7 +23,7 @@ const Namespaces = require("../Namespaces")
 
 
 
-local function GetPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
+local function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
 	if type(packet) ~= "table" then return end
 	if type(packet.Data) ~= "buffer" then return end
 	if type(packet.References) ~= "table" then return end
@@ -154,10 +154,10 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 		if #requestStack > 0 then
 			for _, request in requestStack do
 
-				local thread = request.Thread
+				local thread: thread = request.Thread
 
 				local timeoutThread: thread?
-				local requestThread = task.spawn(function()
+				local requestThread: thread = task.spawn(function()
 					local responsePacket: NetworkPacket? = remoteFunction:InvokeServer(request.Packet)
 					
 					if timeoutThread then
@@ -172,7 +172,7 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 						return
 					end
 
-					local packet = GetPacketOrQueryAndVerifyPacket(responsePacket)
+					local packet = getPacketOrQueryAndVerifyPacket(responsePacket)
 					if not packet then
 						coroutine.resume(thread, nil)
 						return
@@ -216,7 +216,7 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 		if type(incomingData) ~= "table" then return end
 
 		for _, networkPacket in incomingData do
-			if not GetPacketOrQueryAndVerifyPacket(networkPacket) then return end
+			if not getPacketOrQueryAndVerifyPacket(networkPacket) then return end
 		end
 
 		for _, networkPacket in incomingData do
@@ -255,7 +255,7 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 		if not next(responseHandlers) then return nil end
 
 		--// Verify data first, before we deserialize anything
-		local packet = GetPacketOrQueryAndVerifyPacket(networkPacket)
+		local packet = getPacketOrQueryAndVerifyPacket(networkPacket)
 		if not packet then return nil end
 
 		--// Ensure theres actually a response handler
