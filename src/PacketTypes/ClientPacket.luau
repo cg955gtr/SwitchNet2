@@ -20,7 +20,7 @@ type Packet<T> = Typedefs.Packet<T>
 
 
 
-local function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Packet<T>
+const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Packet<T>
 	
 	--// Packet name and namespace are assigned later when the namespace is registered
 	local streamType: StreamType<T> = type :: any

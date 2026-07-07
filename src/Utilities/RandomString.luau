@@ -12,7 +12,7 @@ const DEFAULT_MAX: number = 24
 const CHAR_RANGE_MIN: number = 36
 const CHAR_RANGE_MAX: number = 122
 
-local function randomString(length: number?, returnAsBuffer: boolean?): string | buffer
+const function randomString(length: number?, returnAsBuffer: boolean?): string | buffer
 	
 	local randomStringSize: number = length or math.random(DEFAULT_MIN, DEFAULT_MAX)
 	local randomStringBuffer: buffer = buffer.create(randomStringSize)

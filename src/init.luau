@@ -30,20 +30,19 @@
 --!native
 --!optimize 2
 
-const VERSION = "v0.3.0"
-const OUTPUT_MESSAGE = true
+const VERSION: string = "v0.3.1"
+const OUTPUT_MESSAGE: boolean = true
 
-const NAMESPACE_NAME_SIZE_LIMIT = 32
-const PACKET_NAME_SIZE_LIMIT = 64
+const NAMESPACE_NAME_SIZE_LIMIT: number = 32
+const PACKET_NAME_SIZE_LIMIT: number = 64
 
-const NAMESPACE_STORAGE_NAME = "SwitchNet2_Namespaces"
+const NAMESPACE_STORAGE_NAME: string = "SwitchNet2_Namespaces"
 
 --// Services
 
 const LogService = game:GetService("LogService")
 const RunService = game:GetService("RunService")
 const HttpService = game:GetService("HttpService")
-const TestService = game:GetService("TestService")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --// Dependencies
@@ -57,8 +56,8 @@ const ServerProcessor = require("@self/Processors/Server")
 const ClientProcessor = require("@self/Processors/Client")
 
 const ClientPacket = require("@self/PacketTypes/ClientPacket")
-const ServerPacket = require("@self/PacketTypes/ServerPacket")
 const ClientQuery = require("@self/PacketTypes/ClientQuery")
+const ServerPacket = require("@self/PacketTypes/ServerPacket")
 const ServerQuery = require("@self/PacketTypes/ServerQuery")
 
 --const FilterContainer = require("@self/Utilities/FilterContainer")
@@ -84,7 +83,7 @@ const SwitchNet2 = {
 
 --// Setup type name lookup, for namespace sharing
 const typeNameLookups: { [StreamType<any>]: string } = {}
-for name, streamType in (TypeStores :: any) :: { [string]: StreamType<any> } do
+for name: string, streamType: StreamType<any> in (TypeStores :: any) :: { [string]: StreamType<any> } do
 	if type(streamType) ~= "function" then
 		typeNameLookups[streamType] = name
 	end
@@ -138,7 +137,7 @@ end
 
 function SwitchNet2._convertStreamTypeToNameTree<T>(streamType: StreamType<T>): ConvertedTypeTree
 
-	local name = typeNameLookups[streamType :: StreamType<T>]
+	local name: string? = typeNameLookups[streamType :: StreamType<T>]
 	if name then
 		return { Name = name }
 	end
@@ -146,8 +145,8 @@ function SwitchNet2._convertStreamTypeToNameTree<T>(streamType: StreamType<T>): 
 	local typecasted = streamType :: StreamTypeWithArgs<T>
 	local customName = typecasted.TypeName :: string
 		
-	local typeArgNames = {} :: { ConvertedTypeTree }
-	for i, v in typecasted.TypeArgs do
+	local typeArgNames: { ConvertedTypeTree } = {}
+	for i: number, v: StreamType<any> in typecasted.TypeArgs do
 		typeArgNames[i] = SwitchNet2._convertStreamTypeToNameTree(v)
 	end
 
@@ -163,8 +162,8 @@ function SwitchNet2._convertNameTreeToStreamType<T>(typeData: ConvertedTypeTree)
 	local streamType = (TypeStores :: any)[typeData.Name]
 	
 	if typeData.Args then
-		local typeArgs = {}
-		for index, data in typeData.Args do
+		local typeArgs: { StreamType<any> } = {}
+		for index: number, data: { Name: string, Args: { ConvertedTypeTree }? } in typeData.Args do
 			typeArgs[index] = SwitchNet2._convertNameTreeToStreamType(data)
 		end
 		return streamType(table.unpack(typeArgs))
@@ -181,10 +180,10 @@ function SwitchNet2._shareNamespace(namespace: { [string]: Packet<any> | Query<a
 	if not SwitchNet2.NamespaceShareStore then return end
 	if SwitchNet2.NamespaceShareStore:FindFirstChild(name) then return end
 
-	local data = {} :: { any }
+	local data: { any } = {}
 
 	for _, v in namespace do
-		local isQuery = (v :: any).Invoke ~= nil
+		local isQuery: boolean = (v :: any).Invoke ~= nil
 		local structure = {
 			IsQuery = isQuery,
 			Id = v.Id,
@@ -203,7 +202,7 @@ function SwitchNet2._shareNamespace(namespace: { [string]: Packet<any> | Query<a
 		table.insert(data, structure)
 	end
 	
-	local value = Instance.new("StringValue")
+	local value: StringValue = Instance.new("StringValue")
 	value.Name = name
 	value.Value = HttpService:JSONEncode(data)
 	value.Parent = SwitchNet2.NamespaceShareStore
@@ -212,7 +211,7 @@ end
 
 function SwitchNet2._registerRemoteNamespace(value: StringValue): { [string]: Packet<any> | Query<any, any> }?
 
-	local name = value.Name
+	local name: string = value.Name
 	if Namespaces[name] then return nil end --// Probably locally defined already somewhere
 
 	local data = HttpService:JSONDecode(value.Value)
@@ -220,8 +219,8 @@ function SwitchNet2._registerRemoteNamespace(value: StringValue): { [string]: Pa
 	local packets = {} :: { [string]: Packet<any> | Query<any, any> }
 
 	for _, structure in data do
-		local id = structure.Id
-		local isQuery = structure.IsQuery
+		local id: string = structure.Id
+		local isQuery: boolean = structure.IsQuery
 
 		if isQuery then
 			packets[id] = SwitchNet2.RegisterQuery({
@@ -245,7 +244,7 @@ end
 if runContext == "Server" then
 	SwitchNet2.NamespaceShareStore = ReplicatedStorage:FindFirstChild(NAMESPACE_STORAGE_NAME) :: Folder
 	if not SwitchNet2.NamespaceShareStore then
-		local shareStore = Instance.new("Folder")
+		local shareStore: Folder = Instance.new("Folder")
 		shareStore.Name = NAMESPACE_STORAGE_NAME
 		shareStore.Parent = ReplicatedStorage
 
@@ -259,7 +258,7 @@ else
 		SwitchNet2._registerRemoteNamespace(value :: StringValue)
 	end)
 
-	for _, value in shareStore:GetChildren() do
+	for _, value: Instance in shareStore:GetChildren() do
 		SwitchNet2._registerRemoteNamespace(value :: StringValue)
 	end
 end
@@ -273,27 +272,28 @@ ClientProcessor.init(runContext)
 
 
 if OUTPUT_MESSAGE then
-	task.spawn(function()
-		--// Print message
-		--// Check if it exists already too, so if theres several dependencies, it won't add extras
-		local message = `SwitchNet2 {runContext} - {VERSION} loaded successfully! Created by 8ch99.`
-		local logHistory = LogService:GetLogHistory() :: {
-			{
-				timestamp: number,
-				message: string,
-				messageType: Enum.MessageType,
-			}
+	
+	local message = `SwitchNet2 {VERSION} - {runContext} initialized - @8ch99.`
+	local logHistory = LogService:GetLogHistory() :: {
+		{
+			timestamp: number,
+			message: string,
+			messageType: Enum.MessageType,
 		}
-		
-		for _, log in logHistory do
-			if log.message == message then
-				--// Message was sent already, cancel!
-				return
-			end
+	}
+	
+	local hasDuplicateMessage: boolean = false
+	for _, log in logHistory do
+		if log.message == message then
+			hasDuplicateMessage = true
+			break
 		end
-		
-		TestService:Message(message)
-	end)
+	end
+
+	if not hasDuplicateMessage then
+		print(message)
+	end
+
 end
 
 

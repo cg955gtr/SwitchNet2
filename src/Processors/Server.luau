@@ -6,8 +6,8 @@
 --!native
 --!optimize 2
 
-const NAMESPACE_NAME_SIZE_LIMIT = 32
-const PACKET_NAME_SIZE_LIMIT = 64
+const NAMESPACE_NAME_SIZE_LIMIT: number = 32
+const PACKET_NAME_SIZE_LIMIT: number = 64
 
 --// Services
 
@@ -24,20 +24,21 @@ const Namespaces = require("../Namespaces")
 
 
 
-local function GetChildAndReconcileIfNil(parent: Instance, name: string, className: string): Instance
-	local child = parent:FindFirstChild(name)
+const function getChildAndCreateIfNil(parent: Instance, name: string, className: string): Instance
+	local child: Instance? = parent:FindFirstChild(name)
 	if child then
 		return child
 	end
 
-	local newInstance = Instance.new(className)
+	local newInstance: Instance = Instance.new(className)
 	newInstance.Name = name
 	newInstance.Parent = parent
 
 	return newInstance
 end
 
-local function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
+const function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): any
+
 	if type(packet) ~= "table" then return end
 	if type(packet.Data) ~= "buffer" then return end
 	if type(packet.References) ~= "table" then return end
@@ -52,6 +53,7 @@ local function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): 
 	if not realPacket then return end
 
 	return realPacket
+
 end
 
 --// Typedefs
@@ -66,13 +68,13 @@ type NetworkPacket = Typedefs.NetworkPacket
 const ServerProcessor = {}
 
 
-const sendStack = {} :: { [Player]: { NetworkPacket } }
-const sendStackUnreliable = {} :: { [Player]: { NetworkPacket } }
-const globalSendStack = {} :: { NetworkPacket }
-const globalSendStackUnreliable = {} :: { NetworkPacket }
-const requestStack = {} :: { [Player]: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } }
+const sendStack: { [Player]: { NetworkPacket } } = {}
+const sendStackUnreliable: { [Player]: { NetworkPacket } } = {}
+const globalSendStack: { NetworkPacket } = {}
+const globalSendStackUnreliable: { NetworkPacket } = {}
+const requestStack: { [Player]: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } } = {}
 
-const processingRequests = {} :: { [thread]: { Player: Player, RequestThread: thread, TimeoutThread: thread? } }
+const processingRequests: { [thread]: { Player: Player, RequestThread: thread, TimeoutThread: thread? } } = {}
 
 const eventCallbacks = {} :: { [string]: (Player, string, string, any) -> () }
 const eventCallbacksUnreliable = {} :: { [string]: (Player, string, string, any) -> () }
@@ -100,6 +102,8 @@ function ServerProcessor.UnbindUnreliable(id: string)
 	eventCallbacksUnreliable[id] = nil
 end
 
+
+
 function ServerProcessor.SetResponseHandler(namespace: string, packet: string, callback: (any, Player) -> any)
 	local namespaceStore = responseHandlers[namespace]
 	if not namespaceStore then
@@ -121,7 +125,7 @@ end
 
 
 function ServerProcessor.Queue<T>(packet: Packet<T>, buff: buffer, references: { any }, player: Player)
-	local stack = sendStack[player]
+	local stack: { NetworkPacket } = sendStack[player]
 	if not stack then
 		stack = {}
 		sendStack[player] = stack
@@ -145,7 +149,7 @@ function ServerProcessor.QueueToAll<T>(packet: Packet<T>, buff: buffer, referenc
 end
 
 function ServerProcessor.QueueUnreliable<T>(packet: Packet<T>, buff: buffer, references: { any }, player: Player)
-	local stack = sendStackUnreliable[player]
+	local stack: { NetworkPacket } = sendStackUnreliable[player]
 	if not stack then
 		stack = {}
 		sendStackUnreliable[player] = stack
@@ -169,8 +173,8 @@ function ServerProcessor.QueueToAllUnreliable<T>(packet: Packet<T>, buff: buffer
 end
 
 function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, buff: buffer, references: { any }, timeout: number?): T2
-	local thread = coroutine.running()
-	local stack = requestStack[player]
+	local thread: thread = coroutine.running()
+	local stack: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } = requestStack[player]
 	if not stack then
 		stack = {}
 		requestStack[player] = stack
@@ -197,9 +201,14 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 	if runContext ~= "Server" then return end
 
 	--// Get remote events
-	local remoteEvent = GetChildAndReconcileIfNil(ReplicatedStorage, "SwitchNet2_Reliable", "RemoteEvent") :: RemoteEvent
-	local unreliableRemoteEvent = GetChildAndReconcileIfNil(ReplicatedStorage, "SwitchNet2_Unreliable", "UnreliableRemoteEvent") :: UnreliableRemoteEvent
-	local remoteFunction = GetChildAndReconcileIfNil(ReplicatedStorage, "SwitchNet2_Function", "RemoteFunction") :: RemoteFunction
+	local remoteEvent = getChildAndCreateIfNil(ReplicatedStorage, "SwitchNet2_Reliable", "RemoteEvent") :: RemoteEvent
+	local unreliableRemoteEvent = getChildAndCreateIfNil(ReplicatedStorage, "SwitchNet2_Unreliable", "UnreliableRemoteEvent") :: UnreliableRemoteEvent
+	local remoteFunction = getChildAndCreateIfNil(ReplicatedStorage, "SwitchNet2_Function", "RemoteFunction") :: RemoteFunction
+
+
+	const compressStreamType: (StreamType<any>, any, number?) -> (buffer, { any }) = Byte.CompressStreamType
+	const decompressStreamType: (StreamType<any>, buffer, { any }) -> any = Byte.DecompressStreamType
+
 
 	ServerProcessor._playerRemoving = Players.PlayerRemoving:Connect(function(player: Player)
 
@@ -232,8 +241,8 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 	ServerProcessor._replicationJob = RunService.PostSimulation:Connect(function()
 
 		--// Per-player stacks
-		for player, requests in requestStack do
-			for _, request in requests do
+		for player: Player, requests: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } in requestStack do
+			for _, request: { Thread: thread, Timeout: number?, Packet: NetworkPacket } in requests do
 
 				local thread: thread = request.Thread
 				
@@ -261,7 +270,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 						return
 					end
 
-					local value = Byte.DecompressStreamType(packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
+					local value: any = decompressStreamType(packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
 					coroutine.resume(thread, value)
 				end)
 
@@ -286,20 +295,19 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 
 
 
-		for player, packets in sendStack do
+		for player: Player, packets: { NetworkPacket } in sendStack do
 			if #packets > 0 then
 				remoteEvent:FireClient(player, packets)
 			end
 		end
 
-		table.clear(sendStack)
-
-		for player, packets in sendStackUnreliable do
+		for player: Player, packets: { NetworkPacket } in sendStackUnreliable do
 			if #packets > 0 then
 				unreliableRemoteEvent:FireClient(player, packets)
 			end
 		end
 
+		table.clear(sendStack)
 		table.clear(sendStackUnreliable)
 
 		--// Global stacks (FireAllClients)
@@ -317,7 +325,8 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 
 
 
-	local function processIncomingCall(player: Player, incomingData: { NetworkPacket }, callbackList: { [string]: (Player, string, string, any) -> () })
+	const function processIncomingCall(player: Player, incomingData: { NetworkPacket }, callbackList: { [string]: (Player, string, string, any) -> () })
+		
 		if not next(callbackList) then return end
 		
 		--// Verify data first, before we deserialize anything
@@ -331,14 +340,14 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 			local namespaceName: string = networkPacket.Namespace
 			local packetName: string = networkPacket.Packet
 
-			local namespace = Namespaces[namespaceName]
-			local packet = namespace[packetName]
+			local namespace: { [string]: Packet<any> } = Namespaces[namespaceName]
+			local packet: Packet<any> = namespace[packetName]
 
-			local success1: boolean, value: any = pcall(Byte.DecompressStreamType, packet.StreamType, networkPacket.Data, networkPacket.References)
+			local success1: boolean, value: any = pcall(decompressStreamType, (packet :: any).StreamType, networkPacket.Data, networkPacket.References)
 			if not success1 or not value then return end --// 99% of the time it'd be a malformed packet (due to tampering)
 			
-			for name, callback in callbackList do
-				local success, result = pcall(task.spawn, callback, player, namespaceName, packetName, value)
+			for name, callback: (Player, string, string, any) -> () in callbackList do
+				local success: boolean, result: any = pcall(task.spawn, callback, player, namespaceName, packetName, value)
 				if not success then
 					TestService:Error(`SwitchNet2.ServerProcessor: Callback '{name}' Error:\n{result}`)
 				end
@@ -359,6 +368,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 
 
 	remoteFunction.OnServerInvoke = function(player: Player, networkPacket: NetworkPacket): NetworkPacket?
+
 		if not next(responseHandlers) then return nil end
 
 		--// Verify data first, before we deserialize anything
@@ -366,19 +376,19 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 		if not packet then return nil end
 
 		--// Ensure theres actually a response handler
-		local handlerPool = responseHandlers[networkPacket.Namespace]
-		local responseHandler = if handlerPool then handlerPool[networkPacket.Packet] else nil
+		local handlerPool: { [string]: (any, Player) -> any } = responseHandlers[networkPacket.Namespace]
+		local responseHandler: ((any, Player) -> any)? = if handlerPool then handlerPool[networkPacket.Packet] else nil
 		if not responseHandler then return nil end
 
 		--// Proceed!
-		local success1: boolean, value: any = pcall(Byte.DecompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)
+		local success1: boolean, value: any = pcall(decompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)
 		if not success1 or not value then return nil end
 
-		local success, result = pcall(responseHandler, value, player)
+		local success: boolean, result: any = pcall(responseHandler, value, player)
 		if not success then return nil end
 		--// ^ Return nothing, safest choice
 
-		local success2, buff, references = pcall(Byte.CompressStreamType, packet.ResponseStreamType, result, packet.ResponseByteSize)
+		local success2: boolean, buff: buffer, references: { any } = pcall(compressStreamType, packet.ResponseStreamType, result, packet.ResponseByteSize)
 		if not success2 or not buff or not references then return nil end
 
 		--// Relay!
@@ -388,6 +398,7 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 			Data = buff,
 			References = references,
 		}
+
 	end
 	
 

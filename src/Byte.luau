@@ -6,11 +6,13 @@
 --!native
 --!optimize 2
 
-const HEADER = "SN2\16\26"
-const HEADER_SIZE = #HEADER
+const HEADER: string = "SN2\16\26"
+const HEADER_SIZE: number = #HEADER
 
-const BUFFER_SIZE_LIMIT = 2 ^ 21
-const MAX_REFERENCES = 2 ^ 16
+const BUFFER_SIZE_LIMIT: number = 2 ^ 21
+const MAX_REFERENCES: number = 2 ^ 16
+
+const REFERENCES_PRE_ALLOC_SIZE: number = 32
 
 --// Dependencies
 
@@ -24,7 +26,7 @@ type Query<T1, T2> = Typedefs.Query<T1, T2>
 
 --// @module Byte
 
-local function getSizeOfType<T>(streamType: StreamType<T>, associatedData: T): number
+const function getSizeOfType<T>(streamType: StreamType<T>, associatedData: T): number
 	local size: number? = streamType.Size
 	if size then
 		return size
@@ -38,16 +40,10 @@ local function getSizeOfType<T>(streamType: StreamType<T>, associatedData: T): n
 	return 0
 end
 
-
-
-const Byte = {
-	GetSizeOfType = getSizeOfType
-}
-
-function Byte.CompressStreamType<T>(streamType: StreamType<T>, data: T, byteSize: number?): (buffer, { any })
+const function compressStreamType<T>(streamType: StreamType<T>, data: T, byteSize: number?): (buffer, { any })
 	local size: number = byteSize or getSizeOfType(streamType, data)
 	local buff: buffer = buffer.create(size + HEADER_SIZE)
-	local references: { any } = table.create(32) :: { any }
+	local references: { any } = table.create(REFERENCES_PRE_ALLOC_SIZE) --:: { any }
 
 	buffer.writestring(buff, 0, HEADER)
 	streamType.Write(buff, references, HEADER_SIZE, data)
@@ -55,15 +51,18 @@ function Byte.CompressStreamType<T>(streamType: StreamType<T>, data: T, byteSize
 	return buff, references
 end
 
-function Byte.DecompressStreamType<T>(streamType: StreamType<T>, buff: buffer, references: { any }): T
+const function decompressStreamType<T>(streamType: StreamType<T>, buff: buffer, references: { any }): T
 	local size: number = buffer.len(buff)
 	assert(size <= BUFFER_SIZE_LIMIT, "buffer too large!")
 	assert(buffer.readstring(buff, 0, HEADER_SIZE) == HEADER, "invalid data sequence provided (unknown header)")
 	assert(#references <= MAX_REFERENCES, "too many references!")
 
-	local value = streamType.Read(buff, references, HEADER_SIZE)
-
-	return value
+	return (streamType.Read(buff, references, HEADER_SIZE))
 end
 
-return Byte
+
+return {
+	GetSizeOfType = getSizeOfType,
+	CompressStreamType = compressStreamType,
+	DecompressStreamType = decompressStreamType,
+}

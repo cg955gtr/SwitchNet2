@@ -72,7 +72,7 @@ function FilterContainer.RemoveFilter<T...>(self: FilterContainer<T...>, name: s
 	if not self._container[name] then return end
 	self._container[name] = nil
 
-	for i, node: FilterInfoNode in self._order do
+	for i: number, node: FilterInfoNode in self._order do
 		if node.Name == name then
 			table.remove(self._order, i)
 			self:_resort()

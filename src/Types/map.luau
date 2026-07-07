@@ -39,7 +39,7 @@ return function<T1, T2>(keyType: Typedefs.StreamType<T1>, valueType: Typedefs.St
 			if fixedKeySize then
 				size += fixedKeySize * count
 			elseif getKeySize then
-				for mapKey in value do
+				for mapKey: T1 in value do
 					size += getKeySize(mapKey)
 				end
 			end
@@ -47,7 +47,7 @@ return function<T1, T2>(keyType: Typedefs.StreamType<T1>, valueType: Typedefs.St
 			if fixedValueSize then
 				size += fixedValueSize * count
 			elseif getValueSize then
-				for _, mapValue in value do
+				for _, mapValue: T2 in value do
 					size += getValueSize(mapValue)
 				end
 			end

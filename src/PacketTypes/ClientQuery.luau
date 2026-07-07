@@ -19,7 +19,7 @@ type Query<T1, T2> = Typedefs.Query<T1, T2>
 
 
 
-local function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout: number?): Query<T1, T2>
+const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout: number?): Query<T1, T2>
 	
 	--// Packet name and namespace are assigned later when the namespace is registered
 	local requestStreamType: StreamType<T1> = requestType :: any

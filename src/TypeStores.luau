@@ -76,10 +76,10 @@ const types = {
 do
 	--// Setup `auto` type
 
-	local autoValueTypeCache = {} :: { [any]: { Id: number, Type: StreamType<any> } }
+	const autoValueTypeCache: { [any]: { Id: number, Type: StreamType<any> } } = {}
 	--// ^ Cache for auto types so we don't have to redetermine them for the GetGize and Write calls
 
-	local autoTypes = {
+	const autoTypes = {
 
 		{
 			Type = types.null :: any,
@@ -249,9 +249,10 @@ do
 	} :: { { Type: StreamType<any>, Condition: (value: any, typeName: string) -> boolean } }
 
 
-	local function GetAutoType(value: any): (StreamType<any>, number)
-		local typeName = typeof(value)
-		for id, autoType in autoTypes do
+
+	const function getAutoType(value: any): (StreamType<any>, number)
+		local typeName: string = typeof(value)
+		for id: number, autoType: { Type: any, Condition: (any, string) -> boolean } in autoTypes do
 			if autoType.Condition(value, typeName) then
 				return autoType.Type :: any, id
 			end
@@ -260,30 +261,31 @@ do
 	end
 
 
+
 	types.auto = {
 		TypeName = "auto",
 			
 		GetSize = function(value: any): number
-			local streamType, id = GetAutoType(value)
+			local streamType: StreamType<any>, id: number = getAutoType(value)
 			autoValueTypeCache[value] = { Id = id, Type = streamType }
 
 			return 1 + Byte.GetSizeOfType(streamType, value)
 		end,
 
 		Read = function(buff: buffer, references: { any }, pointer: number): (any, number)
-			local id = buffer.readu8(buff, pointer)
+			local id: number = buffer.readu8(buff, pointer)
 			if id == 0 then
 				return (types.unknown :: StreamType<unknown>).Read(buff, references, pointer + 1)
 			end
 
-			local streamType = autoTypes[id].Type
-			local value, offset = streamType.Read(buff, references, pointer + 1)
+			local streamType: StreamType<any> = autoTypes[id].Type
+			local value: any, offset: number = streamType.Read(buff, references, pointer + 1)
 
 			return value, offset + 1
 		end,
 
 		Write = function(buff: buffer, references: { any }, pointer: number, value: any): number
-			local typeData = autoValueTypeCache[value]
+			local typeData: { Id: number, Type: StreamType<any> } = autoValueTypeCache[value]
 			autoValueTypeCache[value] = nil
 
 			buffer.writeu8(buff, pointer, typeData.Id)
