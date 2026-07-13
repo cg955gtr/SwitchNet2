@@ -67,6 +67,16 @@ const responseHandlers = {} :: {
 }
 
 
+--[[
+function ClientProcessor._getCallbacks(): { [string]: (string, string, any) -> () }
+	return eventCallbacks
+end
+
+function ClientProcessor._getUnrCallbacks(): { [string]: (string, string, any) -> () }
+	return eventCallbacksUnreliable
+end
+]]
+
 
 function ClientProcessor.Bind(id: string, callback: (string, string, any) -> ())
 	eventCallbacks[id] = callback
@@ -215,7 +225,7 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 
 
 
-	const function ProcessIncomingRequest(incomingData: { NetworkPacket }, callbackList: { [string]: (string, string, any) -> () })
+	const function processIncomingRequest(incomingData: { NetworkPacket }, callbackList: { [string]: (string, string, any) -> () })
 
 		if not next(callbackList) then return end
 		
@@ -233,8 +243,12 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 			local namespace: { [string]: Packet<any> } = Namespaces[namespaceName]
 			local packet: Packet<any> = namespace[packetName]
 
-			local success1: boolean, value: any = pcall(decompressStreamType, (packet :: any).StreamType, networkPacket.Data, networkPacket.References)
+			if not packet._isBound then
+				--// There is nothing to process this data
+				continue
+			end
 
+			local success1: boolean, value: any = pcall(decompressStreamType, (packet :: any).StreamType, networkPacket.Data, networkPacket.References)
 			if not success1 or not value then return end --// 99% of the time it'd be a malformed packet (due to tampering)
 			
 			for name: string, callback: (string, string, any) -> () in callbackList do
@@ -249,11 +263,11 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 
 
 	ClientProcessor._onServerEvent = remoteEvent.OnClientEvent:Connect(function(incomingData: { NetworkPacket })
-		ProcessIncomingRequest(incomingData, eventCallbacks)
+		processIncomingRequest(incomingData, eventCallbacks)
 	end)
 
 	ClientProcessor._onServerEventUnreliable = unreliableRemoteEvent.OnClientEvent:Connect(function(incomingData: { NetworkPacket })
-		ProcessIncomingRequest(incomingData, eventCallbacksUnreliable)
+		processIncomingRequest(incomingData, eventCallbacksUnreliable)
 	end)
 
 
@@ -269,7 +283,11 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 		--// Ensure theres actually a response handler
 		local handlerPool: { [string]: (any) -> any } = responseHandlers[networkPacket.Namespace]
 		local responseHandler: ((any) -> any)? = if handlerPool then handlerPool[networkPacket.Packet] else nil
-		if not responseHandler then return nil end
+		
+		if not responseHandler then
+			--// There is nothing to process this data
+			return nil
+		end
 
 		--// Proceed!
 		local success1: boolean, value: any = pcall(decompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)

@@ -26,15 +26,13 @@ export type Packet<T> = {
 
 	_filters: { [string]: (T, Player?) -> boolean },
 
+	_isBound: boolean,
+	_activeListeners: { string },
+
 	Send: (data: T, target: Player?) -> (),
 	SendToAll: (data: T) -> (),
 	SendToPlayers: (data: T, targets: { Player }) -> (),
 	SendToAllExcept: (data: T, exemptPlayer: Player) -> (),
-
-	SendUnreliable: (data: T, target: Player?) -> (),
-	SendToAllUnreliable: (data: T) -> (),
-	SendToPlayersUnreliable: (data: T, targets: { Player }) -> (),
-	SendToAllExceptUnreliable: (data: T, exemptPlayer: Player) -> (),
 
 	Wait: () -> (T?, Player?),
 	ListenServer: (callback: (data: T, player: Player) -> ()) -> (() -> ()),
@@ -55,6 +53,8 @@ export type Query<T1, T2> = {
 
 	ListenServer: (callback: (data: T1, player: Player) -> T2) -> (() -> ()),
 	ListenClient: (callback: (data: T1) -> T2) -> (() -> ()),
+
+	_isBound: boolean,
 }
 
 

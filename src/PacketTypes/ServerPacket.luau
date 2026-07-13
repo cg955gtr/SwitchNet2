@@ -2,6 +2,10 @@
 --// Date written: 25th March 2026
 --// SwitchNet2
 
+--!strict
+--!native
+--!optimize 2
+
 --// Services
 
 const Players = game:GetService("Players")
@@ -14,6 +18,9 @@ const ServerProcessor = require("../Processors/Server")
 
 --const FilterContainer = require("../Utilities/FilterContainer")
 const RandomString = require("../Utilities/RandomString")
+
+
+const compressStreamType = Byte.CompressStreamType
 
 --// Typedefs
 
@@ -38,60 +45,57 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 		ByteSize = streamType.Size,
 
 		_filters = {},
+		
+		_isBound = false,
+		_activeListeners = {} :: { string },
 	} :: Packet<T>
 
 
 
-	function self.Send(data: T, player: Player)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ServerProcessor.Queue(self, buff, references, player)
+	--// setup queue methods
+	--// so that we can easily just call the method and define it differently varying on mode
+	local queue: (Packet<T>, buffer, { any }, Player) -> ()
+	local queueToAll: (Packet<T>, buffer, { any }) -> ()
+	local bind: (string, (Player, string, string, any) -> ()) -> ()
+	local unbind: (string) -> ()
+
+	if mode == "Unreliable" then
+		queue = ServerProcessor.QueueUnreliable
+		queueToAll = ServerProcessor.QueueToAllUnreliable
+		bind = ServerProcessor.BindUnreliable
+		unbind = ServerProcessor.UnbindUnreliable
+	elseif mode == "Reliable" then
+		queue = ServerProcessor.Queue
+		queueToAll = ServerProcessor.QueueToAll
+		bind = ServerProcessor.Bind
+		unbind = ServerProcessor.Unbind
+	end
+
+
+
+
+	function self.Send(data: T, player: Player?)
+		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)
+		queue(self, buff, references, player :: Player)
 	end
 
 	function self.SendToAll(data: T)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ServerProcessor.QueueToAll(self, buff, references)
+		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)
+		queueToAll(self, buff, references)
 	end
 
 	function self.SendToPlayers(data: T, players: { Player })
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)
 		for _, player: Player in players do
-			ServerProcessor.Queue(self, buff, references, player)
+			queue(self, buff, references, player)
 		end
 	end
 
 	function self.SendToAllExcept(data: T, exemptPlayer: Player)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
+		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)
 		for _, player: Player in Players:GetPlayers() do
 			if player ~= exemptPlayer then
-				ServerProcessor.Queue(self, buff, references, player)
-			end
-		end
-	end
-
-
-
-	function self.SendUnreliable(data: T, player: Player)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ServerProcessor.QueueUnreliable(self, buff, references, player)
-	end
-
-	function self.SendToAllUnreliable(data: T)
-		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ServerProcessor.QueueToAllUnreliable(self, buff, references)
-	end
-
-	function self.SendToPlayersUnreliable(data: T, players: { Player })
-		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		for _, player in players do
-			ServerProcessor.QueueUnreliable(self, buff, references, player)
-		end
-	end
-
-	function self.SendToAllExceptUnreliable(data: T, exemptPlayer: Player)
-		local buff, references = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		for _, player in Players:GetPlayers() do
-			if player ~= exemptPlayer then
-				ServerProcessor.QueueUnreliable(self, buff, references, player)
+				queue(self, buff, references, player)
 			end
 		end
 	end
@@ -105,17 +109,30 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 	function self.ListenServer(callback: (T, Player) -> ()): () -> ()
 
 		local bound: boolean = true
-		local callbackId: string = self.Namespace .. self.Id .. RandomString(32)
-		ServerProcessor.Bind(callbackId, function(player: Player, namespaceId: string, packet: string, value: any)
+		if not self._isBound then
+			self._isBound = true
+		end
+		
+		local callbackId: string = self.Namespace .. self.Id .. (RandomString(32) :: string)
+		table.insert(self._activeListeners, callbackId)
+		
+		bind(callbackId, function(player: Player, namespaceId: string, packet: string, value: any)
 			if namespaceId == self.Namespace and packet == self.Id then
 				callback(value, player)
 			end
 		end)
 
 		return function()
-			if not bound then return end
+
+			if not self or not bound then return end
 			bound = false
-			ServerProcessor.Unbind(callbackId)
+			unbind(callbackId)
+
+			table.remove(self._activeListeners, table.find(self._activeListeners, callbackId))
+			if #self._activeListeners == 0 then
+				self._isBound = false
+			end
+
 		end
 
 	end

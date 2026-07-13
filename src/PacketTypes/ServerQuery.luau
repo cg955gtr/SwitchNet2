@@ -2,6 +2,10 @@
 --// Date written: 25th March 2026
 --// SwitchNet2
 
+--!strict
+--!native
+--!optimize 2
+
 --// Dependencies
 
 const Typedefs = require("../Typedefs")
@@ -9,6 +13,9 @@ const Byte = require("../Byte")
 const ServerProcessor = require("../Processors/Server")
 
 --const FilterContainer = require("../Utilities/FilterContainer")
+
+
+const compressStreamType = Byte.CompressStreamType
 
 --// Typedefs
 
@@ -34,12 +41,14 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 		ResponseStreamType = responseStreamType,
 		ResponseByteSize = responseStreamType.Size,
 		Timeout = timeout,
+
+		_isBound = false,
 	} :: Query<T1, T2>
 
 
 
-	function self.Invoke(data: T1, player: Player): T2
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.RequestStreamType, data, self.RequestByteSize)
+	function self.Invoke(data: T1, player: Player?): T2
+		local buff: buffer, references: { any } = compressStreamType(self.RequestStreamType, data, self.RequestByteSize)
 		return ServerProcessor.Invoke(self, player :: Player, buff, references, self.Timeout)
 	end
 
@@ -47,12 +56,12 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 
 	function self.ListenServer(callback: (data: T1, player: Player) -> T2): () -> ()
 
-		local bound: boolean = true
+		self._isBound = true
 		ServerProcessor.SetResponseHandler(self.Namespace, self.Id, callback)
 
 		return function()
-			if not bound then return end
-			bound = false
+			if not self or not self._isBound then return end
+			self._isBound = false
 			ServerProcessor.RemoveResponseHandler(self.Namespace, self.Id)
 		end
 		

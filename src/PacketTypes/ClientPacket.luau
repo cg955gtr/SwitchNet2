@@ -2,6 +2,10 @@
 --// Date written: 25th March 2026
 --// SwitchNet2
 
+--!strict
+--!native
+--!optimize 2
+
 --// Dependencies
 
 const Typedefs = require("../Typedefs")
@@ -10,6 +14,9 @@ const ClientProcessor = require("../Processors/Client")
 
 --const FilterContainer = require("../Utilities/FilterContainer")
 const RandomString = require("../Utilities/RandomString")
+
+
+const compressStreamType = Byte.CompressStreamType
 
 --// Typedefs
 
@@ -34,13 +41,34 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 		ByteSize = streamType.Size,
 
 		_filters = {},
+
+		_isBound = false,
+		_activeListeners = {} :: { string },
 	} :: Packet<T>
 
 
 
+	--// setup queue methods
+	--// so that we can easily just call the method and define it differently varying on mode
+	local queue: (Packet<T>, buffer, { any }) -> ()
+	local bind: (string, (string, string, any) -> ()) -> ()
+	local unbind: (string) -> ()
+
+	if mode == "Unreliable" then
+		queue = ClientProcessor.QueueUnreliable
+		bind = ClientProcessor.BindUnreliable
+		unbind = ClientProcessor.UnbindUnreliable
+	elseif mode == "Reliable" then
+		queue = ClientProcessor.Queue
+		bind = ClientProcessor.Bind
+		unbind = ClientProcessor.Unbind
+	end
+
+
+
 	function self.Send(data: T)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ClientProcessor.Queue(self, buff, references)
+		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)
+		queue(self, buff, references)
 	end
 
 	function self.SendToAll()
@@ -57,25 +85,6 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 
 
 
-	function self.SendUnreliable(data: T)
-		local buff: buffer, references: { any } = Byte.CompressStreamType(self.StreamType, data, self.ByteSize)
-		ClientProcessor.QueueUnreliable(self, buff, references)
-	end
-
-	function self.SendToAllUnreliable()
-		error("This is a server only function!")
-	end
-
-	function self.SendToPlayersUnreliable()
-		error("This is a server only function!")
-	end
-
-	function self.SendToAllExceptUnreliable()
-		error("This is a server only function!")
-	end
-
-
-
 	function self.ListenServer()
 		error("This is a server only function!")
 	end
@@ -83,17 +92,30 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 	function self.ListenClient(callback: (T) -> ()): () -> ()
 
 		local bound: boolean = true
-		local callbackId: string = self.Namespace .. self.Id .. RandomString(32)
-		ClientProcessor.Bind(callbackId, function(namespaceId: string, packet: string, value: any)
+		if not self._isBound then
+			self._isBound = true
+		end
+
+		local callbackId: string = self.Namespace .. self.Id .. (RandomString(32) :: string)
+		table.insert(self._activeListeners, callbackId)
+
+		bind(callbackId, function(namespaceId: string, packet: string, value: any)
 			if namespaceId == self.Namespace and packet == self.Id then
 				callback(value)
 			end
 		end)
 
 		return function()
-			if not bound then return end
+
+			if not self or not bound then return end
 			bound = false
-			ClientProcessor.Unbind(callbackId)
+			unbind(callbackId)
+
+			table.remove(self._activeListeners, table.find(self._activeListeners, callbackId))
+			if #self._activeListeners == 0 then
+				self._isBound = false
+			end
+
 		end
 
 	end

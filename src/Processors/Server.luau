@@ -85,6 +85,16 @@ const responseHandlers = {} :: {
 }
 
 
+--[[
+function ServerProcessor._getCallbacks(): { [string]: (Player, string, string, any) -> () }
+	return eventCallbacks
+end
+
+function ServerProcessor._getUnrCallbacks(): { [string]: (Player, string, string, any) -> () }
+	return eventCallbacksUnreliable
+end
+]]
+
 
 function ServerProcessor.Bind(id: string, callback: (Player, string, string, any) -> ())
 	eventCallbacks[id] = callback
@@ -343,6 +353,11 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 			local namespace: { [string]: Packet<any> } = Namespaces[namespaceName]
 			local packet: Packet<any> = namespace[packetName]
 
+			if not packet._isBound then
+				--// There is nothing to process this data
+				continue
+			end
+
 			local success1: boolean, value: any = pcall(decompressStreamType, (packet :: any).StreamType, networkPacket.Data, networkPacket.References)
 			if not success1 or not value then return end --// 99% of the time it'd be a malformed packet (due to tampering)
 			
@@ -378,8 +393,12 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 		--// Ensure theres actually a response handler
 		local handlerPool: { [string]: (any, Player) -> any } = responseHandlers[networkPacket.Namespace]
 		local responseHandler: ((any, Player) -> any)? = if handlerPool then handlerPool[networkPacket.Packet] else nil
-		if not responseHandler then return nil end
-
+		
+		if not responseHandler then
+			--// There is nothing to process this data
+			return nil
+		end
+		
 		--// Proceed!
 		local success1: boolean, value: any = pcall(decompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)
 		if not success1 or not value then return nil end

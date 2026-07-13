@@ -30,7 +30,7 @@
 --!native
 --!optimize 2
 
-const VERSION: string = "v0.3.1"
+const VERSION: string = "v0.3.2"
 const OUTPUT_MESSAGE: boolean = true
 
 const NAMESPACE_NAME_SIZE_LIMIT: number = 32
