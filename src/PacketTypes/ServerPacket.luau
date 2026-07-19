@@ -16,13 +16,15 @@ const Typedefs = require("../Typedefs")
 const Byte = require("../Byte")
 const ServerProcessor = require("../Processors/Server")
 
---const FilterContainer = require("../Utilities/FilterContainer")
+const FilterContainer = require("../Utilities/FilterContainer")
 const RandomString = require("../Utilities/RandomString")
 
 
 const compressStreamType = Byte.CompressStreamType
 
 --// Typedefs
+
+type FilterContainer<T...> = FilterContainer.FilterContainer<T...>
 
 type StreamType<T> = Typedefs.StreamType<T>
 type StreamTypeWithArgs<T> = Typedefs.StreamTypeWithArgs<T>
@@ -35,6 +37,9 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 	
 	--// Packet name and namespace are assigned later when the namespace is registered
 	local streamType: StreamType<T> = type :: any
+
+	local filters: FilterContainer<T, Player> = FilterContainer.new()
+	local preProcessFilters: FilterContainer<Player> = FilterContainer.new()
 	
 	local self = {
 		Id = "",
@@ -44,7 +49,8 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 		StreamType = streamType,
 		ByteSize = streamType.Size,
 
-		_filters = {},
+		_filters = filters,
+		_preProcessFilters = preProcessFilters,
 		
 		_isBound = false,
 		_activeListeners = {} :: { string },
@@ -162,6 +168,42 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 
 		return coroutine.yield()
 
+	end
+
+
+
+	function self.AddFilterClient(name: string, callback: (data: T) -> boolean, priority: number?)
+		error("This is a client only function!")
+	end
+
+	function self.RemoveFilterClient(name: string)
+		error("This is a client only function!")
+	end
+
+	function self.AddPreProcessFilterClient(name: string, callback: () -> boolean, priority: number?)
+		error("This is a client only function!")
+	end
+
+	function self.RemovePreProcessFilterClient(name: string)
+		error("This is a client only function!")
+	end
+
+
+
+	function self.AddFilterServer(name: string, callback: (data: T, player: Player) -> boolean, priority: number?)
+		filters:AddFilter(name, callback, priority)
+	end
+
+	function self.RemoveFilterServer(name: string)
+		filters:RemoveFilter(name)
+	end
+
+	function self.AddPreProcessFilterServer(name: string, callback: (player: Player) -> boolean, priority: number?)
+		preProcessFilters:AddFilter(name, callback, priority)
+	end
+
+	function self.RemovePreProcessFilterServer(name: string)
+		preProcessFilters:RemoveFilter(name)
 	end
 
 

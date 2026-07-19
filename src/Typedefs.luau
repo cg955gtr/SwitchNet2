@@ -4,6 +4,25 @@
 
 --!strict
 
+--// Dependencies
+
+const FilterContainer = require("./Utilities/FilterContainer")
+
+--// Typedefs
+
+type FilterContainer<T...> = FilterContainer.FilterContainer<T...>
+
+
+
+export type NetworkPacket = {
+	Namespace: string,
+	Packet: string,
+	Data: buffer,
+	References: { any },
+}
+
+
+
 export type StreamType<T> = {
 	TypeName: string?,
 	Read: (buff: buffer, references: { any }?, pointer: number) -> (T, number),
@@ -24,7 +43,8 @@ export type Packet<T> = {
 	StreamType: StreamType<T>,
 	ByteSize: number?,
 
-	_filters: { [string]: (T, Player?) -> boolean },
+	_filters: FilterContainer<T, Player?>,
+	_preProcessFilters: FilterContainer<Player?>,
 
 	_isBound: boolean,
 	_activeListeners: { string },
@@ -37,6 +57,16 @@ export type Packet<T> = {
 	Wait: () -> (T?, Player?),
 	ListenServer: (callback: (data: T, player: Player) -> ()) -> (() -> ()),
 	ListenClient: (callback: (data: T) -> ()) -> (() -> ()),
+
+	AddFilterClient: (name: string, callback: (data: T) -> boolean, priority: number?) -> (),
+	RemoveFilterClient: (name: string) -> (),
+	AddPreProcessFilterClient: (name: string, callback: () -> boolean, priority: number?) -> (),
+	RemovePreProcessFilterClient: (name: string) -> (),
+
+	AddFilterServer: (name: string, callback: (data: T, player: Player) -> boolean, priority: number?) -> (),
+	RemoveFilterServer: (name: string) -> (),
+	AddPreProcessFilterServer: (name: string, callback: (player: Player) -> boolean, priority: number?) -> (),
+	RemovePreProcessFilterServer: (name: string) -> (),
 }
 
 export type Query<T1, T2> = {
@@ -49,21 +79,22 @@ export type Query<T1, T2> = {
 	ResponseByteSize: number?,
 	Timeout: number?,
 
+	_isBound: boolean,
+
+	_preProcessFilters: FilterContainer<Player?>,
+
 	Invoke: (data: T1, target: Player?) -> T2,
 
 	ListenServer: (callback: (data: T1, player: Player) -> T2) -> (() -> ()),
 	ListenClient: (callback: (data: T1) -> T2) -> (() -> ()),
 
-	_isBound: boolean,
+	AddPreProcessFilterClient: (name: string, callback: () -> boolean, priority: number?) -> (),
+	RemovePreProcessFilterClient: (name: string) -> (),
+
+	AddPreProcessFilterServer: (name: string, callback: (player: Player) -> boolean, priority: number?) -> (),
+	RemovePreProcessFilterServer: (name: string) -> (),
 }
 
-
-export type NetworkPacket = {
-	Namespace: string,
-	Packet: string,
-	Data: buffer,
-	References: { any },
-}
 
 
 return nil

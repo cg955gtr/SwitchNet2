@@ -247,10 +247,18 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 				--// There is nothing to process this data
 				continue
 			end
+			
+
+			--// pre-process filters
+			if not packet._preProcessFilters:Check() then continue end
 
 			local success1: boolean, value: any = pcall(decompressStreamType, (packet :: any).StreamType, networkPacket.Data, networkPacket.References)
 			if not success1 or not value then return end --// 99% of the time it'd be a malformed packet (due to tampering)
+
+			--// post-process filters
+			if not packet._filters:Check(value) then continue end
 			
+
 			for name: string, callback: (string, string, any) -> () in callbackList do
 				local success: boolean, result: any = pcall(task.spawn, callback, namespaceName, packetName, value)
 				if not success then
@@ -288,6 +296,9 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 			--// There is nothing to process this data
 			return nil
 		end
+
+		--// pre-process filters
+		if not packet._preProcessFilters:Check() then return nil end
 
 		--// Proceed!
 		local success1: boolean, value: any = pcall(decompressStreamType, packet.RequestStreamType, networkPacket.Data, networkPacket.References)

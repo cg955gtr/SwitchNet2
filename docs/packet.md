@@ -71,6 +71,77 @@ callback : (T) -> ()
 () -> ()
 ```
 
+
+## AddFilterClient
+
+```luau
+packet.AddFilterClient(name: string, callback: (T) -> boolean, priority: number?)
+```
+
+- Adds a filter function that returns a boolean determining whether the incoming remote call should be dropped. You can use this for things like verifying remote args.
+- If the function returns `false`, the remote call is dropped.
+- An optional priority can be provided too. (the lower the number, the higher priority)
+- **NOTE**: The `callback` function should *never* yield.
+
+> Parameters
+
+```luau
+name : string
+callback : (T) -> boolean
+priority: number?
+```
+
+
+## RemoveFilterClient
+
+```luau
+packet.RemoveFilterClient(name: string)
+```
+
+- Removes the filter function, if it exists.
+
+> Parameters
+
+```luau
+name : string
+```
+
+
+## AddPreProcessFilterClient
+
+```luau
+packet.AddPreProcessFilterClient(name: string, callback: () -> boolean, priority: number?)
+```
+
+- Adds a pre-process filter function that returns a boolean determining whether the incoming remote call should be dropped.
+- If the function returns `false`, the remote call is dropped.
+- The difference between pre-process filters is that these are called *before* any data decompression is done. These are useful for authorization of players, and other non-data filters.
+- An optional priority can be provided too. (the lower the number, the higher priority)
+- **NOTE**: The `callback` function should *never* yield.
+
+> Parameters
+
+```luau
+name : string
+callback : () -> boolean
+priority: number?
+```
+
+
+## RemovePreProcessFilterClient
+
+```luau
+packet.RemoveFilterClient(name: string)
+```
+
+- Removes the pre-process filter function, if it exists.
+
+> Parameters
+
+```luau
+name : string
+```
+
 ---
 ---
 
@@ -183,4 +254,76 @@ callback : (T, Player) -> ()
 
 ```luau
 () -> ()
+```
+
+
+
+## AddFilterServer
+
+```luau
+packet.AddFilterServer(name: string, callback: (T, Player) -> boolean, priority: number?)
+```
+
+- Adds a filter function that returns a boolean determining whether the incoming remote call should be dropped. You can use this for things like verifying remote args.
+- If the function returns `false`, the remote call is dropped.
+- An optional priority can be provided too. (the lower the number, the higher priority)
+- **NOTE**: The `callback` function should *never* yield.
+
+> Parameters
+
+```luau
+name : string
+callback : (T, Player) -> boolean
+priority: number?
+```
+
+
+## RemoveFilterServer
+
+```luau
+packet.RemoveFilterServer(name: string)
+```
+
+- Removes the filter function, if it exists.
+
+> Parameters
+
+```luau
+name : string
+```
+
+
+## AddPreProcessFilterServer
+
+```luau
+packet.AddPreProcessFilterServer(name: string, callback: (Player) -> boolean, priority: number?)
+```
+
+- Adds a pre-process filter function that returns a boolean determining whether the incoming remote call should be dropped.
+- If the function returns `false`, the remote call is dropped.
+- The difference between pre-process filters is that these are called *before* any data decompression is done. These are useful for authorization of players, and other non-data filters.
+- An optional priority can be provided too. (the lower the number, the higher priority)
+- **NOTE**: The `callback` function should *never* yield.
+
+> Parameters
+
+```luau
+name : string
+callback : (Player) -> boolean
+priority: number?
+```
+
+
+## RemovePreProcessFilterServer
+
+```luau
+packet.RemoveFilterServer(name: string)
+```
+
+- Removes the pre-process filter function, if it exists.
+
+> Parameters
+
+```luau
+name : string
 ```

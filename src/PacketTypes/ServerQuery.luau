@@ -12,12 +12,14 @@ const Typedefs = require("../Typedefs")
 const Byte = require("../Byte")
 const ServerProcessor = require("../Processors/Server")
 
---const FilterContainer = require("../Utilities/FilterContainer")
+const FilterContainer = require("../Utilities/FilterContainer")
 
 
 const compressStreamType = Byte.CompressStreamType
 
 --// Typedefs
+
+type FilterContainer<T...> = FilterContainer.FilterContainer<T...>
 
 type StreamType<T> = Typedefs.StreamType<T>
 type StreamTypeWithArgs<T> = Typedefs.StreamTypeWithArgs<T>
@@ -31,10 +33,14 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 	--// Packet name and namespace are assigned later when the namespace is registered
 	local requestStreamType: StreamType<T1> = requestType :: any
 	local responseStreamType: StreamType<T2> = responseType :: any
+
+	local preProcessFilters: FilterContainer<Player> = FilterContainer.new()
 	
 	local self = {
 		Id = "",
 		Namespace = "",
+
+		_preProcessFilters = preProcessFilters,
 
 		RequestStreamType = requestStreamType,
 		RequestByteSize = requestStreamType.Size,
@@ -69,6 +75,26 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 
 	function self.ListenClient()
 		error("This is a client only function!")
+	end
+
+
+
+	function self.AddPreProcessFilterClient(name: string, callback: () -> boolean, priority: number?)
+		error("This is a client only function!")
+	end
+
+	function self.RemovePreProcessFilterClient(name: string)
+		error("This is a client only function!")
+	end
+
+	
+
+	function self.AddPreProcessFilterServer(name: string, callback: (player: Player) -> boolean, priority: number?)
+		preProcessFilters:AddFilter(name, callback, priority)
+	end
+
+	function self.RemovePreProcessFilterServer(name: string)
+		preProcessFilters:RemoveFilter(name)
 	end
 
 

@@ -14,7 +14,7 @@ FilterContainer.__index = FilterContainer
 
 --// Typedefs
 
-type FilterInfoNode = { Name: string, Priority: number }
+export type FilterInfoNode = { name: string, priority: number }
 
 export type FilterContainer<T...> = typeof(setmetatable({} :: {
 	_container: { [string]: (T...) -> boolean },
@@ -51,7 +51,7 @@ end
 
 function FilterContainer._resort<T...>(self: FilterContainer<T...>)
 	table.sort(self._order, function(a: FilterInfoNode, b: FilterInfoNode): boolean
-		return a.Priority < b.Priority
+		return a.priority < b.priority
 	end)
 end
 
@@ -62,7 +62,11 @@ function FilterContainer.AddFilter<T...>(self: FilterContainer<T...>, name: stri
 	if self._container[name] then return end
 	self._container[name] = callback
 
-	local node: FilterInfoNode = { Name = name, Priority = priority or self._defaultPriority }
+	local node: FilterInfoNode = {
+		name = name,
+		priority = priority or self._defaultPriority,
+	}
+
 	table.insert(self._order, node)
 	self:_resort()
 end
@@ -73,9 +77,9 @@ function FilterContainer.RemoveFilter<T...>(self: FilterContainer<T...>, name: s
 	self._container[name] = nil
 
 	for i: number, node: FilterInfoNode in self._order do
-		if node.Name == name then
+		if node.name == name then
 			table.remove(self._order, i)
-			self:_resort()
+			--self:_resort()
 			break
 		end
 	end
@@ -97,10 +101,10 @@ function FilterContainer.Check<T...>(self: FilterContainer<T...>, ...: T...): (b
 	if #self._order == 0 then return true, nil end --// None to check
 
 	for _, node: FilterInfoNode in self._order do
-		local callback: (T...) -> boolean = self._container[node.Name]
+		local callback: (T...) -> boolean = self._container[node.name]
 		local result: boolean = callback(...)
 		if not result then
-			return false, node.Name
+			return false, node.name
 		end
 	end
 
@@ -115,7 +119,7 @@ function FilterContainer.LenientCheck<T...>(self: FilterContainer<T...>, ...: T.
 	if #self._order == 0 then return true end --// None to check
 
 	for _, node: FilterInfoNode in self._order do
-		local callback: (T...) -> boolean = self._container[node.Name]
+		local callback: (T...) -> boolean = self._container[node.name]
 		local result: boolean = callback(...)
 		if result then
 			return true
@@ -146,7 +150,7 @@ end
 function FilterContainer.GetFilterNames<T...>(self: FilterContainer<T...>, name: string): { string }
 	local names: { string } = {}
 	for _, node: FilterInfoNode in self._order do
-		table.insert(names, node.Name)
+		table.insert(names, node.name)
 	end
 	return names
 end
