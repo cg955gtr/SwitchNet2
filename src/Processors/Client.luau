@@ -6,9 +6,6 @@
 --!native
 --!optimize 2
 
-const NAMESPACE_NAME_SIZE_LIMIT: number = 32
-const PACKET_NAME_SIZE_LIMIT: number = 64
-
 --// Services
 
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,9 +14,15 @@ const TestService = game:GetService("TestService")
 
 --// Dependencies
 
+const Constants = require("../Constants")
 const Byte = require("../Byte")
 const Typedefs = require("../Typedefs")
 const Namespaces = require("../Namespaces")
+
+
+
+const NAMESPACE_NAME_SIZE_LIMIT: number = Constants.NAMESPACE_NAME_SIZE_LIMIT
+const PACKET_NAME_SIZE_LIMIT: number = Constants.PACKET_NAME_SIZE_LIMIT
 
 
 
@@ -194,7 +197,10 @@ function ClientProcessor.init(runContext: "Server" | "Client")
 						return
 					end
 
-					local value: any = decompressStreamType(packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
+					local success: boolean, value: any = pcall(decompressStreamType, packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
+					--if success then
+					--	coroutine.resume(thread, value)
+					--end
 					coroutine.resume(thread, value)
 				end)
 

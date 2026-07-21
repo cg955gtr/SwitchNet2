@@ -53,6 +53,20 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 
 
 
+	function self._destroy()
+
+		self._isBound = false
+		ClientProcessor.RemoveResponseHandler(self.Namespace, self.Id)
+
+		self._preProcessFilters:Destroy()
+
+		table.clear(self)
+		self = nil :: never
+
+	end
+
+
+
 	function self.Invoke(data: T1): T2
 		local buff: buffer, references: { any } = compressStreamType(self.RequestStreamType, data, self.RequestByteSize)
 		return ClientProcessor.Invoke(self, buff, references, self.Timeout)

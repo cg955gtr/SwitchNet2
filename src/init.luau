@@ -26,17 +26,14 @@
 	SOFTWARE.
 ]=]
 
+--!nolint LocalUnused
+
 --!strict
 --!native
 --!optimize 2
 
-const VERSION: string = "v0.4.0"
+const VERSION: string = "v0.5.0"
 const OUTPUT_MESSAGE: boolean = true
-
-const NAMESPACE_NAME_SIZE_LIMIT: number = 32
-const PACKET_NAME_SIZE_LIMIT: number = 64
-
-const NAMESPACE_STORAGE_NAME: string = "SwitchNet2_Namespaces"
 
 --// Services
 
@@ -49,6 +46,7 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 const runContext: "Client" | "Server" = if RunService:IsClient() then "Client" else "Server"
 
+const Constants = require("@self/Constants")
 const Typedefs = require("@self/Typedefs")
 const TypeStores = require("@self/TypeStores")
 const Namespaces = require("@self/Namespaces")
@@ -82,12 +80,14 @@ const SwitchNet2 = {
 
 
 --// Setup type name lookup, for namespace sharing
+--[[
 const typeNameLookups: { [StreamType<any>]: string } = {}
 for name: string, streamType: StreamType<any> in (TypeStores :: any) :: { [string]: StreamType<any> } do
 	if type(streamType) ~= "function" then
 		typeNameLookups[streamType] = name
 	end
 end
+]]
 
 
 
@@ -105,28 +105,26 @@ function SwitchNet2.RegisterQuery<T1, T2>(parameters: { RequestType: T1, Respons
 		ServerQuery(parameters.RequestType, parameters.ResponseType, parameters.Timeout)
 end
 
-function SwitchNet2.RegisterNamespace<T>(name: string, packets: T, share: boolean?): T
+function SwitchNet2.RegisterNamespace<T>(name: string, packets: T, _skipCheck: boolean?): T
 	
-	assert(#name <= NAMESPACE_NAME_SIZE_LIMIT, `Namespace name '{name}' is too large! Size limit is {NAMESPACE_NAME_SIZE_LIMIT}`)
-	--assert(Namespaces[name] == nil, `Namespace '{name}' already exists!`)
-	if Namespaces[name] then
+	assert(#name <= Constants.NAMESPACE_NAME_SIZE_LIMIT, `Namespace name '{name}' is too large! Size limit is {Constants.NAMESPACE_NAME_SIZE_LIMIT}`)
+	if not _skipCheck and Namespaces[name] then
 		return (Namespaces[name] :: any) :: T
 	end
 
 	local typecasted: { [string]: Packet<any> } = packets :: any
-	Namespaces[name] = typecasted
-
 	for packetName: string in typecasted do
-		assert(#packetName <= PACKET_NAME_SIZE_LIMIT, `Packet name '{packetName}' in namespace '{name}' is too large! Size limit is {PACKET_NAME_SIZE_LIMIT}`)
+		assert(#packetName <= Constants.PACKET_NAME_SIZE_LIMIT, `Packet name '{packetName}' in namespace '{name}' is too large! Size limit is {Constants.PACKET_NAME_SIZE_LIMIT}`)
 	end
 
-	for packetName: string, packet: Packet<any> in typecasted do
+	Namespaces[name] = typecasted
+	for packetName, packet in typecasted do
 		packet.Id = packetName
 		packet.Namespace = name
 	end
-
-	if share and runContext == "Server" then
-		SwitchNet2._shareNamespace(typecasted, name)
+	
+	if runContext == "Server" then
+		--SwitchNet2._shareNamespace(name, typecasted)
 	end
 
 	return packets
@@ -135,6 +133,107 @@ end
 
 
 
+function SwitchNet2.AddPacketToNamespace<T>(namespace: string, packetName: string, parameters: { Mode: "Reliable" | "Unreliable", Type: T }): Packet<T>
+
+	assert(#packetName <= Constants.PACKET_NAME_SIZE_LIMIT, `Packet name '{packetName}' in namespace '{namespace}' is too large! Size limit is {Constants.PACKET_NAME_SIZE_LIMIT}`)
+	assert(Namespaces[namespace], `Namespace '{namespace}' doesn't exist!`)
+
+	local existing = Namespaces[namespace][packetName]
+	if existing then
+		if existing.Invoke ~= nil then
+			--// It's a query
+			error(`Query '{packetName}' in namespace '{namespace}' already exists!`)
+		else
+			error(`Packet '{packetName}' in namespace '{namespace}' already exists!`)
+		end
+	end
+	
+
+	local packet: Packet<T> = SwitchNet2.RegisterPacket(parameters)
+
+	packet.Id = packetName
+	packet.Namespace = namespace
+
+	Namespaces[namespace][packetName] = packet
+
+	if runContext == "Server" then
+		--// update all clients
+		--SwitchNet2._shareNamespace(namespace, Namespaces[namespace])
+	end
+
+	return packet
+
+end
+
+function SwitchNet2.RemovePacketFromNamespace<T>(namespace: string, packetName: string)
+
+	assert(Namespaces[namespace], `Namespace {namespace} doesn't exist!`)
+
+	local packet: Packet<T> = assert(Namespaces[namespace][packetName], `Packet {packetName} doesn't exist!`)
+	assert(packet.DisconnectAll ~= nil, `'{packetName}' in namespace '{namespace}' is not a packet!`)
+
+	
+	packet._destroy()
+	if runContext == "Server" then
+		--// update all clients
+		--SwitchNet2._shareNamespace(namespace, Namespaces[namespace])
+	end
+
+end
+
+
+
+function SwitchNet2.AddQueryToNamespace<T1, T2>(namespace: string, queryName: string, parameters: { RequestType: T1, ResponseType: T2, Timeout: number? }): Query<T1, T2>
+
+	assert(#queryName <= Constants.PACKET_NAME_SIZE_LIMIT, `Query name '{queryName}' in namespace '{namespace}' is too large! Size limit is {Constants.PACKET_NAME_SIZE_LIMIT}`)
+	assert(Namespaces[namespace], `Namespace '{namespace}' doesn't exist!`)
+
+	local existing: any? = Namespaces[namespace][queryName]
+	if existing then
+		if existing.Invoke ~= nil then
+			--// It's a query
+			error(`Query '{queryName}' in namespace '{namespace}' already exists!`)
+		else
+			error(`Packet '{queryName}' in namespace '{namespace}' already exists!`)
+		end
+	end
+	
+
+	local query: Query<T1, T2> = SwitchNet2.RegisterQuery(parameters)
+
+	query.Id = queryName
+	query.Namespace = namespace
+
+	Namespaces[namespace][queryName] = query
+
+	if runContext == "Server" then
+		--// update all clients
+		--SwitchNet2._shareNamespace(namespace, Namespaces[namespace])
+	end
+
+	return query
+
+end
+
+function SwitchNet2.RemoveQueryFromNamespace<T1, T2>(namespace: string, queryName: string)
+
+	assert(Namespaces[namespace], `Namespace {namespace} doesn't exist!`)
+
+	local query: Query<T1, T2> = assert(Namespaces[namespace][queryName], `Query {queryName} doesn't exist!`)
+	assert(query.Invoke ~= nil, `'{queryName}' in namespace '{namespace}' is not a query!`)
+	
+	
+	query._destroy()
+	if runContext == "Server" then
+		--// update all clients
+		--SwitchNet2._shareNamespace(namespace, Namespaces[namespace])
+	end
+
+end
+
+
+
+--[[
 function SwitchNet2._convertStreamTypeToNameTree<T>(streamType: StreamType<T>): ConvertedTypeTree
 
 	local name: string? = typeNameLookups[streamType :: StreamType<T>]
@@ -173,12 +272,10 @@ function SwitchNet2._convertNameTreeToStreamType<T>(typeData: ConvertedTypeTree)
 
 end
 
-
-
-function SwitchNet2._shareNamespace(namespace: { [string]: Packet<any> | Query<any, any> }, name: string)
+function SwitchNet2._shareNamespace(name: string, namespace: { [string]: Packet<any> | Query<any, any> })
 
 	if not SwitchNet2.NamespaceShareStore then return end
-	if SwitchNet2.NamespaceShareStore:FindFirstChild(name) then return end
+	--if SwitchNet2.NamespaceShareStore:FindFirstChild(name) then return end
 
 	local data: { any } = {}
 
@@ -201,22 +298,24 @@ function SwitchNet2._shareNamespace(namespace: { [string]: Packet<any> | Query<a
 
 		table.insert(data, structure)
 	end
-	
-	local value: StringValue = Instance.new("StringValue")
-	value.Name = name
-	value.Value = HttpService:JSONEncode(data)
-	value.Parent = SwitchNet2.NamespaceShareStore
+
+
+	local foundValue = SwitchNet2.NamespaceShareStore:FindFirstChild(name) :: StringValue?
+	if foundValue then
+		foundValue.Value = HttpService:JSONEncode(data)
+	else
+		local value = Instance.new("StringValue")
+		value.Name = name
+		value.Value = HttpService:JSONEncode(data)
+		value.Parent = SwitchNet2.NamespaceShareStore
+	end
 
 end
 
-function SwitchNet2._registerRemoteNamespace(value: StringValue): { [string]: Packet<any> | Query<any, any> }?
+function SwitchNet2._registerRemoteNamespace(name: string, json: string): { [string]: Packet<any> | Query<any, any> }?
 
-	local name: string = value.Name
-	if Namespaces[name] then return nil end --// Probably locally defined already somewhere
-
-	local data = HttpService:JSONDecode(value.Value)
-	
-	local packets = {} :: { [string]: Packet<any> | Query<any, any> }
+	local data = HttpService:JSONDecode(json)
+	local packets: { [string]: Packet<any> | Query<any, any> } = {}
 
 	for _, structure in data do
 		local id: string = structure.Id
@@ -235,13 +334,14 @@ function SwitchNet2._registerRemoteNamespace(value: StringValue): { [string]: Pa
 		end
 	end
 
-	return SwitchNet2.RegisterNamespace(name, packets)
+	return SwitchNet2.RegisterNamespace(name, packets, true)
 
 end
 
 
 
 if runContext == "Server" then
+	
 	SwitchNet2.NamespaceShareStore = ReplicatedStorage:FindFirstChild(NAMESPACE_STORAGE_NAME) :: Folder
 	if not SwitchNet2.NamespaceShareStore then
 		local shareStore: Folder = Instance.new("Folder")
@@ -250,18 +350,30 @@ if runContext == "Server" then
 
 		SwitchNet2.NamespaceShareStore = shareStore
 	end
+
 else
+	
 	SwitchNet2.NamespaceShareStore = ReplicatedStorage:WaitForChild(NAMESPACE_STORAGE_NAME) :: Folder
+
+	const function register(value: StringValue)
+		const name: string = value.Name
+		SwitchNet2._registerRemoteNamespace(name, value.Value)
+		value.Changed:Connect(function(json: string)
+			SwitchNet2._registerRemoteNamespace(name, json)
+		end)
+	end
 	
 	local shareStore = SwitchNet2.NamespaceShareStore :: Folder
 	shareStore.ChildAdded:Connect(function(value: Instance)
-		SwitchNet2._registerRemoteNamespace(value :: StringValue)
+		register(value :: StringValue)
 	end)
 
 	for _, value: Instance in shareStore:GetChildren() do
-		SwitchNet2._registerRemoteNamespace(value :: StringValue)
+		register(value :: StringValue)
 	end
+
 end
+]]
 
 
 --// Finalize
@@ -272,8 +384,8 @@ ClientProcessor.init(runContext)
 
 
 if OUTPUT_MESSAGE then
-	
-	local message = `SwitchNet2 {VERSION} - {runContext} initialized - @8ch99.`
+
+	local message = `SwitchNet2 {VERSION} - {runContext} initialized - @8ch99`
 	local logHistory = LogService:GetLogHistory() :: {
 		{
 			timestamp: number,

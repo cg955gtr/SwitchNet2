@@ -43,11 +43,13 @@ export type Packet<T> = {
 	StreamType: StreamType<T>,
 	ByteSize: number?,
 
+	_isBound: boolean,
+	_activeListeners: { string },
+
 	_filters: FilterContainer<T, Player?>,
 	_preProcessFilters: FilterContainer<Player?>,
 
-	_isBound: boolean,
-	_activeListeners: { string },
+	_destroy: () -> (),
 
 	Send: (data: T, target: Player?) -> (),
 	SendToAll: (data: T) -> (),
@@ -57,6 +59,7 @@ export type Packet<T> = {
 	Wait: () -> (T?, Player?),
 	ListenServer: (callback: (data: T, player: Player) -> ()) -> (() -> ()),
 	ListenClient: (callback: (data: T) -> ()) -> (() -> ()),
+	DisconnectAll: () -> (),
 
 	AddFilterClient: (name: string, callback: (data: T) -> boolean, priority: number?) -> (),
 	RemoveFilterClient: (name: string) -> (),
@@ -82,6 +85,8 @@ export type Query<T1, T2> = {
 	_isBound: boolean,
 
 	_preProcessFilters: FilterContainer<Player?>,
+
+	_destroy: () -> (),
 
 	Invoke: (data: T1, target: Player?) -> T2,
 

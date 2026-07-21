@@ -6,16 +6,16 @@
 --!native
 --!optimize 2
 
+--// Constants
+
 const HEADER: string = "SN2\16\26"
 const HEADER_SIZE: number = #HEADER
-
-const BUFFER_SIZE_LIMIT: number = 2 ^ 21
-const MAX_REFERENCES: number = 2 ^ 16
 
 const REFERENCES_PRE_ALLOC_SIZE: number = 32
 
 --// Dependencies
 
+const Constants = require("./Constants")
 const Typedefs = require("./Typedefs")
 
 --// Typedefs
@@ -42,6 +42,8 @@ end
 
 const function compressStreamType<T>(streamType: StreamType<T>, data: T, byteSize: number?): (buffer, { any })
 	local size: number = byteSize or getSizeOfType(streamType, data)
+	assert(size <= Constants.BUFFER_SIZE_LIMIT, "buffer too large!")
+
 	local buff: buffer = buffer.create(size + HEADER_SIZE)
 	local references: { any } = table.create(REFERENCES_PRE_ALLOC_SIZE) --:: { any }
 
@@ -53,9 +55,9 @@ end
 
 const function decompressStreamType<T>(streamType: StreamType<T>, buff: buffer, references: { any }): T
 	local size: number = buffer.len(buff)
-	assert(size <= BUFFER_SIZE_LIMIT, "buffer too large!")
+	assert(size <= Constants.BUFFER_SIZE_LIMIT, "buffer too large!")
 	assert(buffer.readstring(buff, 0, HEADER_SIZE) == HEADER, "invalid data sequence provided (unknown header)")
-	assert(#references <= MAX_REFERENCES, "too many references!")
+	assert(#references <= Constants.MAX_REFERENCES, "too many references!")
 
 	return (streamType.Read(buff, references, HEADER_SIZE))
 end

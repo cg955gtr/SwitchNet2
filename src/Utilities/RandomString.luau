@@ -6,15 +6,14 @@
 --!native
 --!optimize 2
 
-const DEFAULT_MIN: number = 5
-const DEFAULT_MAX: number = 24
-
+const DEFAULT_SIZE_MIN: number = 5
+const DEFAULT_SIZE_MAX: number = 24
 const CHAR_RANGE_MIN: number = 36
 const CHAR_RANGE_MAX: number = 122
 
-const function randomString(length: number?, returnAsBuffer: boolean?): string | buffer
+const function randomString(length: number?): string
 	
-	local randomStringSize: number = length or math.random(DEFAULT_MIN, DEFAULT_MAX)
+	local randomStringSize: number = length or math.random(DEFAULT_SIZE_MIN, DEFAULT_SIZE_MAX)
 	local randomStringBuffer: buffer = buffer.create(randomStringSize)
 
 	for i: number = 0, randomStringSize - 1 do
@@ -22,7 +21,7 @@ const function randomString(length: number?, returnAsBuffer: boolean?): string |
 		buffer.writeu8(randomStringBuffer, i, randomByte)
 	end
 
-	return if returnAsBuffer then randomStringBuffer else buffer.tostring(randomStringBuffer)
+	return buffer.tostring(randomStringBuffer)
 
 end
 

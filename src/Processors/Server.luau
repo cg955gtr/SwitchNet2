@@ -6,9 +6,6 @@
 --!native
 --!optimize 2
 
-const NAMESPACE_NAME_SIZE_LIMIT: number = 32
-const PACKET_NAME_SIZE_LIMIT: number = 64
-
 --// Services
 
 const Players = game:GetService("Players")
@@ -18,6 +15,7 @@ const TestService = game:GetService("TestService")
 
 --// Dependencies
 
+const Constants = require("../Constants")
 const Byte = require("../Byte")
 const Typedefs = require("../Typedefs")
 const Namespaces = require("../Namespaces")
@@ -43,11 +41,11 @@ const function getPacketOrQueryAndVerifyPacket(packet: Typedefs.NetworkPacket): 
 	if type(packet.Data) ~= "buffer" then return end
 	if type(packet.References) ~= "table" then return end
 
-	if type(packet.Namespace) ~= "string" or #packet.Namespace > NAMESPACE_NAME_SIZE_LIMIT then return end
+	if type(packet.Namespace) ~= "string" or #packet.Namespace > Constants.NAMESPACE_NAME_SIZE_LIMIT then return end
 	local namespace = Namespaces[packet.Namespace]
 	if not namespace then return end
 
-	if type(packet.Packet) ~= "string" or #packet.Packet > PACKET_NAME_SIZE_LIMIT then return end
+	if type(packet.Packet) ~= "string" or #packet.Packet > Constants.PACKET_NAME_SIZE_LIMIT then return end
 
 	local realPacket = namespace[packet.Packet]
 	if not realPacket then return end
@@ -183,6 +181,7 @@ function ServerProcessor.QueueToAllUnreliable<T>(packet: Packet<T>, buff: buffer
 end
 
 function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, buff: buffer, references: { any }, timeout: number?): T2
+
 	local thread: thread = coroutine.running()
 	local stack: { { Thread: thread, Timeout: number?, Packet: NetworkPacket } } = requestStack[player]
 	if not stack then
@@ -202,6 +201,7 @@ function ServerProcessor.Invoke<T1, T2>(query: Query<T1, T2>, player: Player, bu
 	})
 
 	return coroutine.yield()
+
 end
 
 
@@ -280,7 +280,10 @@ function ServerProcessor.init(runContext: "Server" | "Client")
 						return
 					end
 
-					local value: any = decompressStreamType(packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
+					local success: boolean, value: any = pcall(decompressStreamType, packet.ResponseStreamType, responsePacket.Data, responsePacket.References)
+					--if success then
+					--	coroutine.resume(thread, value)
+					--end
 					coroutine.resume(thread, value)
 				end)
 

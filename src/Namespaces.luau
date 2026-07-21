@@ -4,6 +4,6 @@
 
 --!strict
 
-const Typedefs = require("./Typedefs")
+--const Typedefs = require("./Typedefs")
 
-return {} :: { [string]: { [string]: Typedefs.Packet<any> } }
+return {} :: { [string]: { [string]: any } } --:: { [string]: { [string]: Typedefs.Packet<any> | Typedefs.Query<any, any> } }

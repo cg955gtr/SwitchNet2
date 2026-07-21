@@ -79,6 +79,29 @@ const function registerPacket<T>(mode: "Reliable" | "Unreliable", type: T): Pack
 
 
 
+	function self._destroy()
+
+		self.DisconnectAll()
+
+		self._filters:Destroy()
+		self._preProcessFilters:Destroy()
+
+		table.clear(self)
+		self = nil :: never
+
+	end
+
+
+
+	function self.DisconnectAll()
+		for _, callbackId: string in self._activeListeners do
+			unbind(callbackId)
+		end
+		table.clear(self._activeListeners)
+		self._isBound = false
+	end
+
+
 
 	function self.Send(data: T, player: Player?)
 		local buff: buffer, references: { any } = compressStreamType(self.StreamType, data, self.ByteSize)

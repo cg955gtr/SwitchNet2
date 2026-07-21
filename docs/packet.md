@@ -71,6 +71,15 @@ callback : (T) -> ()
 () -> ()
 ```
 
+## DisconnectAll
+
+```luau
+packet.DisconnectAll()
+```
+
+- Disconnects all active listeners.
+
+
 
 ## AddFilterClient
 
@@ -255,6 +264,14 @@ callback : (T, Player) -> ()
 ```luau
 () -> ()
 ```
+
+## DisconnectAll
+
+```luau
+packet.DisconnectAll()
+```
+
+- Disconnects all active listeners.
 
 
 
