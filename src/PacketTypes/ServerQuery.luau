@@ -74,21 +74,22 @@ const function registerQuery<T1, T2>(requestType: T1, responseType: T2, timeout:
 
 
 
-	function self.ListenServer(callback: (data: T1, player: Player) -> T2): () -> ()
+	function self.ListenServer(callback: (data: T1, player: Player) -> T2)
 
+		assert(not self._isBound, "ListenServer is already bound!")
 		self._isBound = true
 		ServerProcessor.SetResponseHandler(self.Namespace, self.Id, callback)
-
-		return function()
-			if not self or not self._isBound then return end
-			self._isBound = false
-			ServerProcessor.RemoveResponseHandler(self.Namespace, self.Id)
-		end
 		
 	end
 
 	function self.ListenClient()
 		error("This is a client only function!")
+	end
+
+	function self.Disconnect()
+		if not self._isBound then return end
+		self._isBound = false
+		ServerProcessor.RemoveResponseHandler(self.Namespace, self.Id)
 	end
 
 

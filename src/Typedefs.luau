@@ -90,8 +90,9 @@ export type Query<T1, T2> = {
 
 	Invoke: (data: T1, target: Player?) -> T2,
 
-	ListenServer: (callback: (data: T1, player: Player) -> T2) -> (() -> ()),
-	ListenClient: (callback: (data: T1) -> T2) -> (() -> ()),
+	ListenServer: (callback: (data: T1, player: Player) -> T2) -> (),
+	ListenClient: (callback: (data: T1) -> T2) -> (),
+	Disconnect: () -> (),
 
 	AddPreProcessFilterClient: (name: string, callback: () -> boolean, priority: number?) -> (),
 	RemovePreProcessFilterClient: (name: string) -> (),

@@ -32,7 +32,7 @@
 --!native
 --!optimize 2
 
-const VERSION: string = "v0.5.0"
+const VERSION: string = "v0.5.1"
 const OUTPUT_MESSAGE: boolean = true
 
 --// Services

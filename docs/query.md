@@ -32,11 +32,10 @@ data : T
 ## ListenClient
 
 ```luau
-packet.ListenClient(callback: (data: T1) -> T2): () -> ()
+packet.ListenClient(callback: (data: T1) -> T2)
 ```
 
 - Sets the callback that fires when the client receives a request for this query. This function also handles returning the response data.
-- Returns a function that when called, disconnects the callback function from being fired again permanently.
 
 > Parameters
 
@@ -44,11 +43,13 @@ packet.ListenClient(callback: (data: T1) -> T2): () -> ()
 callback : (data: T1) -> T2
 ```
 
-> Returns
+## Disconnect
 
 ```luau
-() -> ()
+packet.ListenServer()
 ```
+
+- Disconnects the current listener from processing calls.
 
 
 ## AddPreProcessFilterClient
@@ -117,7 +118,6 @@ packet.ListenServer(callback: (data: T1, player: Player) -> T2): () -> ()
 ```
 
 - Sets the callback that fires when the server receives a request for this query. This function also handles returning the response data.
-- Returns a function that when called, disconnects the callback function from being fired again permanently.
 
 > Parameters
 
@@ -125,11 +125,14 @@ packet.ListenServer(callback: (data: T1, player: Player) -> T2): () -> ()
 callback : (data: T1, player: Player) -> T2
 ```
 
-> Returns
+## Disconnect
 
 ```luau
-() -> ()
+packet.ListenServer()
 ```
+
+- Disconnects the current listener from processing calls.
+
 
 
 ## AddPreProcessFilterServer

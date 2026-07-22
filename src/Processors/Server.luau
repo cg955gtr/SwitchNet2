@@ -2,6 +2,8 @@
 --// Date written: 25th March 2026
 --// SwitchNet2
 
+--!nolint LocalUnused
+
 --!strict
 --!native
 --!optimize 2
